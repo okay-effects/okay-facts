@@ -380,6 +380,11 @@ Each stage: spec section first, tests, then code; done-when is the gate.
 6. **Measure** — the same assistant with the shop's data in context vs okay-facts: wrong prices/slots/bookings,
    tokens, latency. Report in this spec.
 7. **Demo page** (§13), then the proxy and the MCP mode (§11), then importers beyond schema.org (§4).
+8. **The router lane** (§17) — the module `okay-facts-router` (rules, the static table, the probe, language,
+   `When`/`Amount`/`Nearest`), names in their cases (`Morph`, the validator's `case`), `Bind.authored`; okay-shop's
+   shop intents and authored answers; okay-mall's turn decision and the Directory's semantic scorer. Done when: the
+   router's answers pass the validator in every language in tests; the measurement of stage 6 (§14.6) recorded with
+   the router lane in it; deployed on every shop with the model lane behind it.
 
 ## 15. Gotchas
 
@@ -462,3 +467,103 @@ Each stage: spec section first, tests, then code; done-when is the gate.
 - **Streaming**: params-first streaming is in the library (`Stream`, `Emit`; tested on the fake port); the Workers AI
   port answers whole (okay-serverless' `Ai` returns the whole JSON), so the mall renders after the answer.
 - **Stage 6 (measure)** not done yet: BACKLOG.
+
+## 17. The router lane (operator, 2026-11-03: a lane with no generative model in front of the model lane)
+
+Most turns of a shop's chat are a few kinds of question — a price, a free time, the hours, the address — answered by
+the same sentence with other values. okay-chat (`~/work/my/okay-chat`, its edge port `okay-chat-edge`) routes such
+turns with no model on the path: rules, a static embedding table, a probe. The router lane does that here, and its
+answers are okay-facts answers: an **authored** `{params, template}` per intent and language, its parameters
+expressions over handles that code found by `find`, validated and rendered by the same resolver (§7–§9). The model
+lane (§10) answers what the router does not understand, budgeted as before.
+
+```
+turn ─► router: rules ─► static table ─► probe ─► intent, confidence
+          │ confident, its slots resolved            │ below the threshold, or a slot it cannot resolve
+          ▼                                          ▼
+        find by code → handles; the intent's authored {params, template} → validator → render
+                                                     the model lane (Bind.turn): as before
+```
+
+### The rule, unchanged
+
+The router never produces a value either: it chooses an intent and fills the slots of a `find`; the answer's
+template is written offline by people (drafted by a model at most, then reviewed and committed as data), its
+parameters are expressions over the handles found. Tests check every authored template against the validator in
+every language, and the validator runs on the router's answers at runtime as on the model's.
+
+### The module `okay-facts-router` (JVM and Scala.js; generic — intents and phrases are data)
+
+- **Rules** (`Rules`, `Re`): patterns in a portable dialect — `\w`, `\b`, `\s`, `\d`, case-insensitive — where a
+  word character is a letter of Latin (with its extensions: Polish) or Cyrillic (with its supplement: Ukrainian),
+  a combining mark or a digit; translated to explicit ranges on BOTH platforms (JavaScript's own `RegExp` in a
+  Worker, `java.util.regex` on the JVM), so a rule matches alike on each. Measured in okay-chat-edge: Scala.js's
+  `java.util.regex` builds every `\w` as a class of all of Unicode (188 rules: 420 ms, more than an isolate's start
+  may take); native `\p{…}` classes 209 ms (V8 builds each anew, 0.4 ms); explicit ranges 0.02 ms a class. Any other
+  escape is refused, so a construct the translation does not know is seen, not mistranslated.
+- **The static table** (`Table`): a vector per unit — a word, two or three adjacent words — distilled from
+  paraphrase-multilingual-MiniLM-L12-v2 (model2vec's method with okay-chat's teacher, okay's `Static`), cut by PCA,
+  half precision, with SIF weights; a text's vector is the weighted mean of its known units', normalised — a lookup
+  and a sum, no inference. A safetensors file (`vecs` F16 `[n, dim]`, `labels.offsets` U64, `labels.bytes` U8,
+  `weights` F64), read from its bytes in place: a row is decoded when a text uses it. Its coverage (the share of a
+  text's words it knows) is reported.
+- **The probe** (`Probe`): multinomial logistic regression over the table's vectors (okay's `Probe`: weights from
+  zero, rows in order, 300 epochs, rate 0.5 — deterministic), fitted at BUILD time by a tool; the host carries the
+  weights (JSON, classes × dim).
+- **Language** (`Detect`): the message's script (any Cyrillic letter: Cyrillic), then letters only one language has
+  and everyday words; an amount with its currency counts for none («do 150 zł» is not Polish); no evidence: the
+  conversation's last language within the script, else the page's.
+- **Slots, generic** — `When`: a day (today, tomorrow, the day after, a weekday, `5.11`, `5 listopada`), a part of
+  the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`, `до 12`, `after 5pm`) in pl, uk, ru,
+  en, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`, `under
+  150`, `max 150`); `Nearest`: the candidates nearest a text in the table (each unit of the text against each
+  candidate's name, in any of its languages), with a threshold and a margin — two close: ambiguous, the host asks.
+- **The router** (`Router`): the intents' rules first (in rank order), then the probe over the message's vector →
+  `Route(intent, by: rule | probe | unknown, p, margin)`; `confident` when by a rule, or `p` and the margin pass the
+  host's thresholds (calibrated on held-out authored rows, recorded in §16).
+- **The data** (`Intents`): `{intents: [{name, rank, rules: [...], examples: {pl: [...], uk: [...], ru: [...],
+  en: [...]}}]}` — a host's own file; the probe is fitted on its examples, the table distilled over its units.
+- **Tools** (`tools/`, scala-cli, never Python): `table.scala` (the units of a corpus embedded by the ONNX encoder —
+  onnxruntime and the HuggingFace tokenizer on the JVM, the model file okay-chat fetches —, PCA, F16, the file
+  written), `fit.scala` (the probe), `coverage.scala` (a table's coverage of a set of texts).
+
+### Names in their cases (core: `Morph`; the model lane too)
+
+A name in a Polish, Ukrainian or Russian sentence takes the case its construction asks ("u Marka", "z Markiem",
+"у Олега"). Rendered as the data has it, it reads wrong ("u Marek"). So:
+
+- An expression may ask a case: `name(master(#s1)) as gen` (also `master(#s1) as gen`): `nom`, `gen`, `dat`,
+  `acc`, `ins`, `loc`.
+- The form comes from the data first — an owner's form, the entity's property `name.<case>` (a text by language;
+  okay-shop's master config, optional) —, else from rules for common first names (`Morph`: Polish, Ukrainian,
+  Russian; male and female patterns, a parenthesised tail kept: "Marek (demo)" → "Marka (demo)"); never guessed:
+  a name the rules are not sure of (another script than the sentence's, an ending they do not know) has no form.
+- A case-asked parameter selects by its sureness: `{m, select, sure {u {m}} other {(mistrz: {m})}}` — `sure` when
+  the form was found, `other` when not, `{m}` then the nominative — so the template keeps a construction that needs
+  no case when the form is not known. English: always `sure`, the name as it is.
+- The validator (code `case`): a parameter rendering a person's name (a class marked `person`) must ask a case; a
+  case other than `nom` only inside its own select with an `other` case. The model lane's prompt says so; the
+  router's templates are written so.
+
+### The authored answer (core: `Bind.authored`)
+
+`Bind.authored(setup, conversation, user, lang, focus, issued, answer, cards)` is the router's way into the same
+conversation: the handles it found issued in the table, the answer validated and rendered by `Resolve`, the history
+kept as the model lane keeps it (the user's words, "Found: …" with the handles' visible words, the answer's own
+`{params, template}`), so a later turn on the model lane knows what the router said; audited (`Audited.Routed`:
+intent, confidence; the reads as any answer's).
+
+### The turn decision (the host's)
+
+Router first: a confident route whose slots resolve answers by the router; anything else — a probe below the
+thresholds, a message of no known word, a slot it cannot resolve that the intent needs — goes to the model lane as
+before (its validator, its policy, its budget). The host logs per turn the lane, the intent and the confidence —
+never the message's words. A host can force a lane (tests, the measurement).
+
+### Measure (stage 6, §14)
+
+A fixed set of realistic turns (≥150, pl/uk/ru/en, over fictional demo shops; data) run through: the router lane
+(with the model lane behind it, as deployed), the model lane alone, and a "usual" baseline — the same model with the
+shop's data as text in its prompt, answering freely (the prompt published beside the results) — counting the share
+answered by the router, the router's accuracy (intent; slots), wrong facts in each lane's answers (a price, a time,
+a duration or a name not true of the data), latency p50/p95 and cost a turn. Results in §14.6.

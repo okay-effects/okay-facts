@@ -16,3 +16,12 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   (okay-shop specs/shop.md "The assistant", `AssistantSuite`); released okay-shop 0.1.0.
 - [x] **okay-mall chat** (stage 5) — `ChatObject`, the cookie, focus, `MallFacts`, `ChatGuard`, per-shop switch,
   audit and dashboard; §12's flow on MemoryCloud, wrangler dev, production (every shop and the landing, 2026-11-03).
+- [ ] **router lane** (stage 8, §17; operator 2026-11-03) and **measure** (stage 6, §14.6) — in flight. Plan, in order:
+  1. okay-facts: module `router` (`Re`/`Rules` portable, `Table` F16 in place, `Probe`, `Detect`, `When`, `Amount`,
+     `Nearest`, `Router`); core `Morph` + case hints + validator `case` + `Bind.authored` + `Audited.Routed`; tools
+     `table.scala`, `fit.scala`, `coverage.scala`; tests both platforms; release 0.1.0 (republished).
+  2. okay-shop: the shop's intents (15) as data with authored phrasings pl/uk/ru/en, the authored answers, `ShopDesk`
+     (the router lane over `ShopFacts`), masters' name forms, the widget's lane in the debug view; tests; release.
+  3. okay-mall: the table in R2 (read on an isolate's first request; the host from its blobs' file), the turn
+     decision in `ChatObject` (lane/intent/confidence logged), the Directory's semantic scorer; the 150-turn set and
+     the measurement; deploy; verify-apex 27/27.
