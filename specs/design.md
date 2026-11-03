@@ -567,3 +567,82 @@ A fixed set of realistic turns (≥150, pl/uk/ru/en, over fictional demo shops; 
 shop's data as text in its prompt, answering freely (the prompt published beside the results) — counting the share
 answered by the router, the router's accuracy (intent; slots), wrong facts in each lane's answers (a price, a time,
 a duration or a name not true of the data), latency p50/p95 and cost a turn. Results in §14.6.
+
+## 18. Rules and constraints (operator, 2026-11-03; stage 9, planned)
+
+The rule (§2) widens from values to reasoning: the model writes neither a value, nor a conclusion, nor a solution.
+A **derived fact** (from rules) and a **found solution** (from constraints) are facts like any other: produced by the
+resolver, bound by handles, rendered by templates, each with its **proof**. Origin: the okay-inlay research
+(~/work/my/okay-inlay specs/inlay.md §8) — Datalog and a SAT solver built inside transformers; here the same
+programs run as the resolver's handlers in the Worker (one program, many handlers: the compiled form is a deeper
+port of the same thing, later).
+
+### 18.1 Two kinds of facts
+
+- **Data facts** — prices, slots, masters, hours, addresses: from the sources; the model never sees a hidden one and
+  never writes any (§2, unchanged).
+- **Intent facts** — what the user wants: "rather before noon", "at Anna's if possible", "300 zł at most". They are
+  the user's words, not data, so the model *extracts* them (that is its semantic work) — always marked as the model's
+  judgement with its confidence, kept apart from data facts in every proof, and confirmable ("did I get it right that
+  you prefer the morning?"). A number the user said (300 zł) is an intent literal (`Expr.Lit`, already allowed as a
+  comparison's operand), never a data value.
+
+### 18.2 The language grows (`Expr`, §6)
+
+- `require(e)` — a hard constraint over handles and variables: `require(price(?a) + price(?b) <= 300 PLN)`,
+  `require(consecutive(?a, ?b))`, `require(day(?a) = tomorrow)`.
+- `prefer(e, w)` — a soft constraint with weight `w` (the model's confidence that the user wants it):
+  `prefer(before(?a, 12:00), 0.8)`, `prefer(master(?a) = #m2, 0.6)`.
+- `solve(?a in slots(#v1), ?b in slots(#v2))` — choice variables over found handles; the result is new handles
+  (`#s3`, `#s7`) issued in the conversation's table, used in `params` as any handle.
+- Rules are not written by the model: they come from the ontology (§4; OWL 2 RL is Datalog) and the shop's policies
+  ("a booking at least 2 h before closing", "a master does only the services she is linked to", "manicure ⊑ nail
+  service", "Mokotów ⊑ Warszawa").
+
+### 18.3 The resolver's new handlers
+
+- **Datalog** (bottom-up, semi-naive; small — a shop's data and rules) — derived facts with their derivation trees.
+- **SAT / weighted MaxSAT** (small: tens to hundreds of variables for a booking) — hard clauses must hold, soft ones
+  maximize total weight; an UNSAT core when nothing satisfies the hard ones.
+- **The model's hints**: per choice variable a guessed value and a confidence (from the conversation) — used to order
+  the search (decide confident variables first, try the guess first, branch only where unsure); they speed the search
+  and never change its result (okay-inlay `Gated.sc`, `Branching.sc`: counts and answers equal under every hint).
+- In the Worker these are ordinary code (milliseconds at these sizes); on okay-serverless' host the same; the
+  compiled-into-weights form (okay-inlay) is research.
+
+### 18.4 Proofs and explanations
+
+- An answer's `facts[]` (§7) gains `proof`: for a derived fact its derivation (rules applied, data facts used, with
+  sources); for a solution the hard constraints it meets (each evaluated on data facts) and the soft ones it honours
+  or drops (with their weights and that they are the model's judgements).
+- **No solution** — the UNSAT core (a minimal set of conflicting conditions) becomes the explanation, rendered by the
+  resolver's phrases: "not consecutive at Anna's before noon: she is busy in the morning (calendar)"; MaxSAT's
+  relaxations become the alternatives ("consecutive at Anna's at {s3}, or before noon at {m2}'s"). The model chooses
+  words for them; it never invents an alternative.
+
+### 18.5 The flow (okay-mall, a booking)
+
+"Manicure and pedicure back to back tomorrow, rather before noon, at Anna's if possible, 300 zł at most":
+
+1. The model: `find` the two services (`#v1`, `#v2`); writes `require` (back to back, tomorrow, the sum ≤ 300 PLN —
+   an expression, no price known), `prefer` (morning 0.8, Anna 0.6), `solve`; hints if it has them.
+2. The resolver: data from the shops' objects, the rules (Datalog), the solver; returns `#s3`, `#s7` with the proof.
+3. The answer: `{params, template}` as always — "{s1} manicure at {m1}'s, right after it {s2} pedicure, together
+   {sum}" — every value a chip, every "why" a branch of the proof; on no solution, the core's explanation and the
+   relaxations.
+
+### 18.6 Checks the validator adds (§9)
+
+- `require` / `prefer` / `solve` parse and type-check; variables range over issued handles only; a `prefer` weight is
+  in (0, 1]; a literal appears only as an intent literal (a comparison's operand), never as a data value.
+- A template may not state a solution's feasibility or a reason in words: "free", "possible", "because" come from the
+  resolver's phrases of the proof (the worded-claims check, §9, extended).
+
+### 18.7 Stage 9 (after the router lane and the measure)
+
+1. `Expr`: `require`, `prefer`, `solve`, choice variables; the validator's checks (§18.6). Tests without a model.
+2. Datalog handler + the shops' rules from okay-shop's data (service links, hours, policies); derivations in `facts[]`.
+3. SAT / MaxSAT handler, UNSAT cores, relaxations; phrases for proofs and explanations (pl/uk/ru/en).
+4. Hints: values and confidences from the model's answer (an optional `hints` field), search ordering by them.
+5. okay-mall: the booking flow of §18.5 on the demo tenants; measure against the current chat on multi-condition
+   requests (right answers, "no" answers with a correct reason, turns, latency).

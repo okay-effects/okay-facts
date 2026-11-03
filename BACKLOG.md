@@ -17,3 +17,8 @@ Found while building (2026-11-03):
 - **Streaming through the Workers AI port**: needs okay-serverless' `Ai` to stream (`stream: true`); the library's
   `Stream` is ready.
 - **Strict mode**: no Workers AI model reaches 90% strict (§16); revisit with new models by the TCK.
+
+9. **rules and constraints** (operator, 2026-11-03; after the router lane and the measure) — derived facts and found
+   solutions as resolver facts with proofs: `require` / `prefer` / `solve` in `Expr`, a Datalog handler (the shops'
+   rules), SAT / weighted MaxSAT with UNSAT cores as explanations, the model's hints ordering the search, intent
+   facts apart from data facts. specs/design.md §18.
