@@ -106,7 +106,7 @@ object Bind:
     val classes = s.schema.classes.map { c =>
       val parent = if c.parents.isEmpty then "" else s" (a ${c.parents.mkString(", ")})"
       val props = s.schema.props(c.name).map(p => s"${p.name}: ${typeWord(p.tpe)}${
-        if p.visible then " [visible]" else ""}").mkString(", ")
+        if p.visible then " [visible]" else ""}${if p.about.nonEmpty then s" (${p.about})" else ""}").mkString(", ")
       s"- ${c.name}$parent #${c.prefix}…: ${c.about}. $props"
     }.mkString("\n")
     val known = if handles.all.isEmpty then "none yet" else handles.all.takeRight(40).map(h =>
@@ -148,7 +148,11 @@ object Bind:
        |
        |$finding
        |$answering
-       |If nothing was found, say so without inventing. Handles known: $known.
+       |FIND FIRST what the user asks about, then answer with the handles found only — never a handle you were not
+       |given. A link is filtered by a handle (service = #v1) or by a name (service = haircut); through a link by a
+       |path (shop.city = Kraków). A shop's own facts (address, hours, rating, reviews) are its properties:
+       |address(#shop1). Every placeholder of the template is a parameter. If nothing was found, say so without
+       |inventing. Handles known: $known.
        |The user is on: ${if focus == "mall" then "the mall's home (find looks in every shop)" else
          focus.stripPrefix("shop:") + "'s pages (find looks in this shop by default)"}.""".stripMargin
 
@@ -178,39 +182,72 @@ object Bind:
           case _ => Right(Value.text(t))
 
   private val ops = Seq("<=", ">=", "!=", "==", "<", ">", "=")
+  private val Called = """(\w+)\s*\(\s*(\w+)\s*\)""".r
 
-  /** `price <= 150 PLN`: a property of the class, an operator, a value */
-  def condition(cls: String, s: String, schema: Schema, today: String, handles: Handles): Either[String, Filter] =
+  /**
+   * `price <= 150 PLN`: a property of the class, an operator, a value — a literal, a handle, or an expression over
+   * handles (`price < price(#v1)`, evaluated here). A link by a path (`shop.city = Kraków`, `city(shop) = Kraków`) or
+   * by a name (`service = haircut`) is found first: the filter then holds for any entity found
+   */
+  def condition[R[_]](cls: String, s: String, schema: Schema, today: String, handles: Handles, scope: Scope,
+                      l: Lang)(using In[Facts, R]): Either[String, Filter] ! R =
     ops.map(op => op -> s.indexOf(op)).filter(_._2 > 0).sortBy(_._2).headOption match
-      case None => Left(s"'$s': write property op value")
+      case None => pure(Left(s"'$s': write property op value"))
       case Some((op, at)) =>
-        val prop = s.substring(0, at).trim
+        val lhs = s.substring(0, at).trim
         val raw = s.substring(at + op.length).trim
-        schema.prop(cls, prop) match
-          case None => Left(s"$cls has no property '$prop' (it has ${schema.props(cls).map(_.name).mkString(", ")})")
-          case Some(_) => literal(raw, today, handles).map(v => Filter(prop, Op.parse(op).get, v))
+        val path = lhs match
+          case Called(inner, link) => Some(link -> inner)
+          case p if p.contains('.') => Some(p.takeWhile(_ != '.') -> p.dropWhile(_ != '.').drop(1))
+          case _ => None
+        def linked(link: String, nested: Query): Either[String, Filter] ! R =
+          Facts.find[R](nested.copy(scope = scope, limit = 50, lang = l)).map(found =>
+            Right(Filter(link, Op.Eq, Value.Many(found.map(f => Value.Entity(f.ent))))))
+        path match
+          case Some((link, inner)) => schema.prop(cls, link).map(_.tpe) match
+            case Some(Type.Entity(target)) => condition[R](target, s"$inner $op $raw", schema, today, handles, scope,
+                l).flatMap {
+                case Left(e) => pure(Left(e))
+                case Right(f) => linked(link, Query(target, filters = Vector(f)))
+              }
+            case _ => pure(Left(s"$cls has no link '$link'"))
+          case None => schema.prop(cls, lhs) match
+            case None => pure(Left(s"$cls has no property '$lhs' (it has ${schema.props(cls).map(_.name)
+                .mkString(", ")})"))
+            case Some(p) => (p.tpe, Op.parse(op).get) match
+              // a link by its name: the entities of that name
+              case (Type.Entity(target), Op.Eq) if !raw.trim.startsWith("#") =>
+                linked(lhs, Query(target, raw.stripPrefix("\"").stripSuffix("\"")))
+              case (_, o) if raw.contains("#") && raw.contains("(") => Expr.parse(raw) match
+                case Left(e) => pure(Left(s"'$raw': $e"))
+                case Right(x) => Eval[R](x, handles).map(_.map(c => Filter(lhs, o, c.value)))
+              case (_, o) => pure(literal(raw, today, handles).map(v => Filter(lhs, o, v)))
 
-  def query(args: Json, schema: Schema, today: String, handles: Handles, l: Lang): Either[String, Query] =
+  def query[R[_]](args: Json, schema: Schema, today: String, handles: Handles, l: Lang)(using In[Facts, R])
+    : Either[String, Query] ! R =
     val cls = args.field("class").collect { case Json.Str(c) => c.trim }.getOrElse("")
-    if schema.cls(cls).isEmpty then Left(s"class '$cls' unknown: one of ${schema.classes.map(_.name).mkString(", ")}")
-    else
-      val where = args.field("where") match
-        case Some(Json.Arr(xs)) => xs.collect { case Json.Str(x) => x }
-        case Some(Json.Str(x)) => x.split(";").toVector
-        case _ => Vector.empty
-      val filters = where.map(_.trim).filter(_.nonEmpty).map(condition(cls, _, schema, today, handles))
-      filters.collectFirst { case Left(e) => e } match
-        case Some(e) => Left(e)
-        case None =>
-          val scope = args.field("scope").collect { case Json.Str(x) => x.trim }.getOrElse("focus") match
-            case "mall" | "all" => Right(Scope.All)
-            case "focus" | "" => Right(Scope.Focus)
-            case h if h.startsWith("#") => handles.get(h).map(x => Scope.Source(x.ent.source))
-              .toRight(s"unknown handle $h")
-            case other => Left(s"scope '$other': focus, mall or a shop's handle")
-          scope.map(sc => Query(cls, args.field("text").collect { case Json.Str(x) => x }.getOrElse(""),
-            filters.collect { case Right(f) => f }, sc,
-            args.field("limit").collect { case Json.Num(n) => n.toInt }.getOrElse(6).max(1).min(10), l))
+    val scope = args.field("scope").collect { case Json.Str(x) => x.trim }.getOrElse("focus") match
+      case "mall" | "all" => Right(Scope.All)
+      case "focus" | "" => Right(Scope.Focus)
+      case h if h.startsWith("#") => handles.get(h).map(x => Scope.Source(x.ent.source)).toRight(s"unknown handle $h")
+      case other => Left(s"scope '$other': focus, mall or a shop's handle")
+    val limit = args.field("limit").flatMap {
+      case Json.Num(n) => Some(n.toInt)
+      case Json.Str(n) => n.trim.toIntOption
+      case _ => None
+    }.getOrElse(6).max(1).min(10)
+    if schema.cls(cls).isEmpty then
+      pure(Left(s"class '$cls' unknown: one of ${schema.classes.map(_.name).mkString(", ")}"))
+    else scope match
+      case Left(e) => pure(Left(e))
+      case Right(sc) =>
+        val where = args.field("where") match
+          case Some(Json.Arr(xs)) => xs.collect { case Json.Str(x) => x }
+          case Some(Json.Str(x)) => x.split(";").toVector
+          case _ => Vector.empty
+        Eval.each(where.map(_.trim).filter(_.nonEmpty))(condition[R](cls, _, schema, today, handles, sc, l)).map(
+          _.map(filters => Query(cls, args.field("text").collect { case Json.Str(x) => x }.getOrElse(""), filters,
+            sc, limit, l)))
 
   // ---- a turn
 
@@ -326,7 +363,7 @@ object Bind:
   private def execute[R[_]](s: Setup, t: ToolCall, today: String, l: Lang, handles: Handles)(using In[Facts, R])
     : (Either[String, Json], Option[Card], Handles => Handles) ! R =
       t.name match
-        case "find" => query(t.arguments, s.schema, today, handles, l) match
+        case "find" => query[R](t.arguments, s.schema, today, handles, l).flatMap {
           case Left(e) => pure((Left(e), None, identity))
           case Right(q) => Facts.find[R](q).map { found =>
               val issue = (h: Handles) => found.foldLeft(h)((acc, f) =>
@@ -338,6 +375,7 @@ object Bind:
                 "note" -> Json.str("nothing matched: say so, or find with fewer conditions"))
                 else Json.obj("found" -> Json.Arr(shown))), None, issue)
             }
+        }
         case name if s.actions.exists(_._1 == name) =>
           val arg = s.actions.find(_._1 == name).get._2
           t.arguments.field(arg).orElse(t.arguments.record.headOption.map(_._2)) match
@@ -393,7 +431,8 @@ object Bind:
               case Policy.Regenerate if tries < s.retries =>
                 val again = st2.copy(msgs = st2.msgs :+ msg("assistant", answerText) :+ msg("user",
                   "Your answer broke the rule: " + vs.map(_.show).mkString("; ") + ". Write it again: no digits " +
-                    "and no names in the template, every value a parameter bound to an expression over handles."))
+                    "and no names in the template, every placeholder a parameter bound to an expression over the " +
+                    s"handles known (${st2.handles.all.map(_.name).mkString(", ")})."))
                 call[R](ask(s, c, again, l, today, focus, tools = false, format = s.level.schema)).flatMap(f =>
                   finish(s, c, again.copy(tokens = again.tokens + f.timing.promptTokens + f.timing.tokens,
                     raw = again.raw :+ f.reply.content, failure = failed(f)), f.reply.content, l, today, focus,

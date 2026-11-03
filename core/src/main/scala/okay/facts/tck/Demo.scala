@@ -38,7 +38,8 @@ object Demo:
       key = Vector("shop", "id"), iri = "https://schema.org/Person", about = "a person doing the services"),
     Cls("Slot", "s", Vector(
       Prop("name", Type.Text, visible = true), Prop("time", Type.Time, about = "when it starts"),
-      Prop("date", Type.Date, about = "its day"), Prop("master", Type.Entity("Master")),
+      Prop("date", Type.Date, about = "its day"), Prop("price", Type.Money, about = "its service's price"),
+      Prop("duration", Type.Duration, about = "its service's duration"), Prop("master", Type.Entity("Master")),
       Prop("service", Type.Entity("Service")), Prop("shop", Type.Entity("Shop")),
       Prop("available", Type.Bool, about = "whether it is still free")),
       key = Vector("shop", "master", "start"), about = "a free start of a service with a master"),
@@ -56,9 +57,18 @@ object Demo:
 
   private def slotRow(shopId: String, svc: Ent, svcName: Value, m: String, date: String, hm: String): Row =
     val start = Zone.instant(date, hm.take(2).toInt * 60 + hm.drop(3).toInt)
+    val (price, minutes) = prices(svc)
     Row(Ent(shopId, "Slot", s"$m@$start"), Map("name" -> svcName, "time" -> Value.At(start), "date" -> Value.Day(date),
+      "price" -> Value.zl(price), "duration" -> Value.Minutes(minutes),
       "master" -> Value.Entity(master(shopId, m)), "service" -> Value.Entity(svc),
       "shop" -> Value.Entity(shop(shopId)), "available" -> Value.Bool(true)), version = 40, updatedAt = now)
+
+  private def prices(svc: Ent): (Long, Int) = svc.key match
+    case "combo" => (9000, 45)
+    case "cut" => (7000, 30)
+    case "hybrid" => (11000, 60)
+    case "classic" => (8000, 45)
+    case _ => (14000, 90)
 
   val combo: Value = t("Strzyżenie + broda", "Стрижка + борода", "Стрижка + борода", "Haircut + beard")
   val cut: Value = t("Strzyżenie męskie", "Чоловіча стрижка", "Мужская стрижка", "Men's haircut")

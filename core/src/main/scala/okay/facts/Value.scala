@@ -103,6 +103,11 @@ object Value:
    * (an instant against an instant, a day — its local date —, or a time of day), days; none: not comparable */
   def compare(a: Value, b: Value): Option[Int] = (a, b) match
     case (Money(x, c), Money(y, d)) if c == d => Some(x.compareTo(y))
+    // a bare number against money or a duration: in its main unit (`150` zł, `30` minutes), as people write it
+    case (Money(x, _), Num(y)) => Some(BigDecimal(x).compare(y * 100))
+    case (Num(x), Money(y, _)) => Some((x * 100).compare(BigDecimal(y)))
+    case (Minutes(x), Num(y)) => Some(BigDecimal(x).compare(y))
+    case (Num(x), Minutes(y)) => Some(x.compare(BigDecimal(y)))
     case (Minutes(x), Minutes(y)) => Some(x.compareTo(y))
     case (Num(x), Num(y)) => Some(x.compare(y))
     case (Count(x, _), Count(y, _)) => Some(x.compareTo(y))

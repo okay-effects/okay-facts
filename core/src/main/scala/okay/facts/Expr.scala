@@ -106,7 +106,11 @@ object Expr:
             args += expr()
             while eat(",") do args += expr()
             if !eat(")") then fail("')'")
-          Call(w, args.result())
+          (w, args.result()) match
+            // `min(price, #v1, #v7)` as `min(price(#v1), price(#v7))`: a property's name first, as argmin takes it
+            case (f, Word(p) +: rest) if Set("min", "max", "sum", "avg")(f) && rest.nonEmpty =>
+              Call(f, rest.map(x => Call(p, Vector(x))))
+            case (f, as) => Call(f, as)
         else w match
           case "true" => Lit(Value.Bool(true))
           case "false" => Lit(Value.Bool(false))
@@ -207,6 +211,9 @@ object Expr:
   private def comparable(a: Type, b: Type): Boolean = (a, b) match
     case (Type.Count(_), Type.Number) | (Type.Number, Type.Count(_)) | (Type.Count(_), Type.Count(_)) => true
     case (Type.Time, Type.Date) | (Type.Date, Type.Time) => true
+    // a bare number against money or a duration: its main unit (`price(#v1) <= 150`)
+    case (Type.Money, Type.Number) | (Type.Number, Type.Money) | (Type.Duration, Type.Number) |
+         (Type.Number, Type.Duration) => true
     case (Type.Entity(_), Type.Entity(_)) => true
     case _ => a == b && !a.isInstanceOf[Type.Many]
 

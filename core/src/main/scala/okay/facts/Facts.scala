@@ -20,13 +20,17 @@ object Op:
     case ">=" => Some(Ge)
     case _ => None
 
-  def holds(op: Op, a: Value, b: Value): Boolean = op match
-    case Eq => Value.same(a, b)
-    case Ne => !Value.same(a, b)
-    case Lt => Value.compare(a, b).exists(_ < 0)
-    case Le => Value.compare(a, b).exists(_ <= 0)
-    case Gt => Value.compare(a, b).exists(_ > 0)
-    case Ge => Value.compare(a, b).exists(_ >= 0)
+  /** a filter against a set (a link resolved by name: `service = haircut`) holds for any of its members */
+  def holds(op: Op, a: Value, b: Value): Boolean = (op, b) match
+    case (Eq, Value.Many(bs)) => bs.exists(Value.same(a, _))
+    case (Ne, Value.Many(bs)) => !bs.exists(Value.same(a, _))
+    case _ => op match
+      case Eq => Value.same(a, b)
+      case Ne => !Value.same(a, b)
+      case Lt => Value.compare(a, b).exists(_ < 0)
+      case Le => Value.compare(a, b).exists(_ <= 0)
+      case Gt => Value.compare(a, b).exists(_ > 0)
+      case Ge => Value.compare(a, b).exists(_ >= 0)
 
 final case class Filter(prop: String, op: Op, value: Value)
 
@@ -87,9 +91,12 @@ final case class Row(ent: Ent, values: Map[String, Value], version: Long = 1L, u
 object Table:
   def find(schema: Schema, rows: Vector[Row], q: Query): Vector[Found] =
     val words = Words.split(q.text)
-    rows.iterator.filter(r => schema.isA(r.ent.cls, q.cls))
+    val scored = rows.iterator.filter(r => schema.isA(r.ent.cls, q.cls))
       .filter(r => q.filters.forall(f => r.values.get(f.prop).exists(v => holds(f.op, v, f.value))))
-      .map(r => r -> score(schema, r, words)).filter(_._2 >= 0).toVector.zipWithIndex
+      .map(r => r -> score(schema, r, words)).filter(_._2 >= 0).toVector
+    // the best matches only: a row of half the words where another has them all is not what was asked
+    val best = scored.map(_._2).maxOption.getOrElse(0.0)
+    scored.filter(_._2 >= best * 0.75).zipWithIndex
       .sortBy { case ((_, s), i) => (-s, i) }.take(q.limit)
       .map { case ((r, _), _) => Found(r.ent, visible(schema, r, q.lang), r.version) }
 
@@ -98,14 +105,16 @@ object Table:
     case Value.Many(vs) => vs.exists(holds(op, _, against))
     case one => Op.holds(op, one, against)
 
-  /** the row's match of the words: -1 when a word matches nothing; no words: 0 */
+  /** the row's match of the words that mean something (3 letters or more: `z`, `na`, `of` aside): -1 when not half
+   * of them match; no such words: 0 */
   def score(schema: Schema, r: Row, words: Vector[String]): Double =
-    if words.isEmpty then 0
+    val meant = words.filter(w => w.length >= 3 || w.exists(_.isDigit))
+    if meant.isEmpty then 0
     else
       val texts = schema.props(r.ent.cls).filter(_.visible).flatMap(p => r.values.get(p.name)).flatMap(textsOf)
       val have = texts.flatMap(Words.split)
-      val each = words.map(w => have.map(h => matching(w, h)).maxOption.getOrElse(0.0))
-      if each.contains(0.0) then -1 else each.sum
+      val each = meant.map(w => have.map(h => matching(w, h)).maxOption.getOrElse(0.0))
+      if each.count(_ > 0) * 2 < meant.size || each.forall(_ == 0) then -1 else each.sum
 
   private def textsOf(v: Value): Vector[String] = v match
     case Value.Text(t) => t.values.toVector

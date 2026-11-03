@@ -1,0 +1,2 @@
+{ "name": "okay-facts-tck", "private": true, "type": "module",
+  "devDependencies": { "wrangler": "^4" } }

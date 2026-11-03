@@ -1,0 +1,7 @@
+# THE TCK'S WORKER (okay-facts specs/design.md §11): the AI binding for the TCK's runner, on `wrangler dev` only
+name = "okay-facts-tck"
+main = "entry.mjs"
+compatibility_date = "2026-10-01"
+[ai]
+binding = "AI"
+remote = true

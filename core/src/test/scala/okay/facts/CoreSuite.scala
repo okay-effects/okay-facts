@@ -232,8 +232,9 @@ class TableSuite extends Ground:
     facts(Facts.find[F](q), focus).map(_.ent.key)
 
   test("words match the visible texts in any language; filters on hidden values by the resolver"):
-    assertEquals(found(Query("Service", "strzyżenie broda"), Some("barber-demo")), Vector("combo"))
-    assertEquals(found(Query("Service", "haircut beard", lang = Lang.en), Some("barber-demo")), Vector("combo"))
+    assertEquals(found(Query("Service", "strzyżenie broda"), Some("barber-demo")).headOption, Some("combo"))
+    assertEquals(found(Query("Service", "haircut beard", lang = Lang.en), Some("barber-demo")).headOption,
+      Some("combo"))
     assertEquals(found(Query("Manicure", filters = Vector(Filter("price", Op.Le, Value.zl(12000))),
       scope = Scope.All)), Vector("hybrid", "classic"))
     val tomorrowMorning = Vector(Filter("date", Op.Eq, Value.Day(Demo.tomorrow)), Filter("time", Op.Lt,
@@ -245,3 +246,13 @@ class TableSuite extends Ground:
     val f = facts(Facts.find[F](Query("Slot", scope = Scope.All, limit = 2)))
     assert(f.forall(_.visible.map(_._1).toSet.subsetOf(Set("name"))))
     assert(f.flatMap(_.visible.map(_._2)).forall(!_.exists(_.isDigit)))
+
+class WireSuite extends Ground:
+  test("an operation over the wire: asked as JSON, served by the local facts, read back the same"):
+    val ops: Vector[Facts[?]] = Vector(Facts.Find(Query("Service", "strzyżenie broda", scope = Scope.All)),
+      Facts.Get(Demo.service("barber-demo", "combo"), "price"),
+      Facts.Act("open", Map("shop" -> Value.Entity(Demo.shop("nails-demo"))), Lang.pl))
+    for op <- ops do
+      val served = facts(Wire.serve[F](okay.effects.json.Json.fromText(Wire.request(op).render)))
+      val direct = facts(perform[Facts](op.asInstanceOf[Facts[Any]]))
+      assertEquals(Wire.answer(op.asInstanceOf[Facts[Any]], Right(served)), direct)

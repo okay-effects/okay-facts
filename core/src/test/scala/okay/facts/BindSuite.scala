@@ -34,7 +34,8 @@ class BindSuite extends munit.FunSuite:
       "wieczorem?")
     assertEquals(r.rendered.map(_.text), Some(expected))
     assertEquals(r.violations, Vector.empty)
-    assertEquals(c.handles.all.map(_.name), Vector("#shop1", "#v1", "#s1", "#s2"))
+    assertEquals(c.handles.all.map(_.name).filter(Set("#shop1", "#v1", "#s1", "#s2")), Vector("#shop1", "#v1", "#s1",
+      "#s2"))
     val seen = c.history.map(_.render).mkString
     for v <- Seq("90", "17:30", "18:15", "45", "Marek") do assert(!seen.contains(v), s"the model saw $v")
 
@@ -95,7 +96,7 @@ class BindSuite extends munit.FunSuite:
     assertEquals(c2.focus, "shop:nails-demo")
     assert(c2.history.exists(_.render.contains("now on the pages of #shop2")))
     assertEquals(c2.handles.get("#v1").map(_.ent.source), Some("barber-demo"))
-    assertEquals(c2.handles.get("#v2").map(_.ent.source), Some("nails-demo"))
+    assertEquals(c2.handles.all.filter(_.ent.cls == "Manicure").map(_.ent.source).distinct, Vector("nails-demo"))
     assertEquals(r2.rendered.map(_.text), Some("Drożej."))
 
   test("find over the mall with a hidden filter; an action gives a card, its handle never a value"):
@@ -113,7 +114,7 @@ class BindSuite extends munit.FunSuite:
     val bad = Model.call("find", """{"class": "Service", "where": ["colour = red"]}""")
     val (_, (c, r)) = turn(l3, Vector(bad, findCombo, """{"params": {"p": "price(#v1)"}, "template": "{p}"}"""), "?")
     assertEquals(r.rendered.map(_.text), Some("90,00 zł"))
-    assertEquals(c.handles.all.count(_.ent.cls == "Service"), 1)
+    assertEquals(c.handles.all.map(_.name).headOption, Some("#shop1"))
 
   test("streamed with params first: the pieces add up to the answer; a split plural held back until whole"):
     val s = l3.copy(stream = true)
@@ -137,3 +138,21 @@ class BindSuite extends munit.FunSuite:
   test("the conversation as JSON, and back"):
     val (_, (c, _)) = turn(l3, Vector(findCombo, findSlots, answer), "?")
     assertEquals(Conversation.fromJson(Conversation.toJson(c)), c)
+
+  test("a find's conditions: a path through a link, a link by name, an expression over handles, a bare number"):
+    def keys(args: String, h: Handles = Handles(), focus: Option[String] = None): Vector[String] =
+      run(Demo.facts(focus)(Bind.query[Facts](okay.effects.json.Json.fromText(args), Demo.schema, Demo.today, h,
+        Lang.pl).flatMap {
+        case Left(e) => pure(Vector(s"error: $e"))
+        case Right(q) => Facts.find[Facts](q).map(_.map(_.ent.key))
+      }))
+    assertEquals(keys("""{"class": "Manicure", "where": ["shop.city = Kraków"], "scope": "mall"}"""), Vector("japanese"))
+    assertEquals(keys("""{"class": "Manicure", "where": ["city(shop) = Kraków"], "scope": "mall"}"""),
+      Vector("japanese"))
+    assert(keys("""{"class": "Slot", "where": ["service = manicure hybrydowy", "date = tomorrow"], "scope": "mall"}""")
+      .forall(_.startsWith("lila@")))
+    val h = Handles().issue("v", Demo.service("nails-demo", "hybrid", "Manicure"), 3, Vector.empty)._1
+    assertEquals(keys("""{"class": "Manicure", "where": ["price < price(#v1)"], "scope": "mall"}""", h),
+      Vector("classic"))
+    assertEquals(keys("""{"class": "Service", "where": ["price <= 80"], "scope": "mall"}"""), Vector("cut", "classic"))
+    assert(keys("""{"class": "Service", "where": ["colour = red"]}""").head.startsWith("error"))

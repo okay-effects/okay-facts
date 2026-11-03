@@ -1,4 +1,5 @@
 /** okay-facts: a fact resolver for LLMs — the model refers by handles, okay-facts resolves (specs/design.md) */
+import org.scalajs.linker.interface.ModuleKind
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
 ThisBuild / organization := "io.github.okay-effects"
@@ -41,3 +42,14 @@ lazy val cloud = crossProject(JVMPlatform, JSPlatform).crossType(CrossType.Pure)
     libraryDependencies ++= Seq("io.github.okay-effects" %%% "okay-serverless" % "0.1.0", munit.value))
 
 lazy val root = (project in file(".")).aggregate(core.jvm, core.js, cloud.jvm, cloud.js).settings(publish / skip := true)
+
+/** THE TCK'S RUNNER (specs/design.md §11, never published): the suite against Workers AI models — through the
+ * passthrough Worker below, run by `wrangler dev` (the account's Workers AI) — the passports printed and written */
+lazy val tck = (project in file("tck")).dependsOn(cloud.jvm)
+  .settings(publish / skip := true, Compile / mainClass := Some("okay.facts.tck.Passports"))
+
+/** THE TCK'S WORKER: the `AI` binding by okay-serverless' Cloudflare (`POST /` `{model, input}` → the model's answer);
+ * `sbt tckWorker/fastLinkJS`, then `tck/worker/run.sh` */
+lazy val tckWorker = (project in file("tck/worker")).enablePlugins(ScalaJSPlugin)
+  .settings(publish / skip := true, scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.ESModule)),
+    libraryDependencies += "io.github.okay-effects" %%% "okay-serverless-cloudflare" % "0.1.0")
