@@ -262,3 +262,12 @@ class ChipSuite extends Ground:
   test("a value computed of several entities: the chip names them all"):
     val r = render(Answer(Vector("c" -> "price(#v1) < price(#v2)"), "{c, select, true {Taniej.} other {Drożej.}}"))
     assertEquals(r.map(_.chips.head.entity), Right("Strzyżenie + broda, Manicure hybrydowy"))
+
+class ClaimSuite extends Ground:
+  def codes(a: Answer): Vector[String] = Validator.check(a, handles, Demo.schema).map(_.code)
+  test("a comparison said in words is a claim the model guessed; inside a select on an expression it is the data's"):
+    assertEquals(codes(Answer(Vector("p" -> "price(#v1)"), "Kosztuje {p}, czyli taniej niż manicure.")),
+      Vector("claim"))
+    assertEquals(codes(Answer(Vector("p" -> "price(#v1)"), "It costs {p}, cheaper than there.")), Vector("claim"))
+    assertEquals(codes(Answer(Vector("c" -> "price(#v1) < price(#v2)"),
+      "{c, select, true {Tak, taniej.} other {Nie, drożej.}}")), Vector.empty)

@@ -24,6 +24,9 @@ object Validator:
       case Left(e) => Vector(Violation("syntax", s"the template at ${e.at}: ${e.what}"))
       case Right(parts) =>
         val texts = Icu.texts(parts)
+        // a comparison said in words, no boolean behind it: the model guessed a fact (a select on an expression says it)
+        val worded = Icu.topTexts(parts).flatMap(t => comparative(t).map(w => Violation("claim",
+          s"'$w' said in words: bind the comparison as an expression and choose the words by a select")))
         val digits = texts.filter(_.exists(_.isDigit)).map(t => Violation("digits", s"'${t.trim.take(40)}'"))
         val names = declared(handles).filter(n => texts.exists(t => contains(t, n)))
           .map(n => Violation("name", s"'$n' is written in the template: bind it as a parameter"))
@@ -38,7 +41,7 @@ object Validator:
         val types = typed.collect { case (n, Right(t)) => n -> t }.toMap
         val unitAfter = Icu.after(parts).collect { case (n, rest) if types.get(n).exists(counted) &&
           unitFirst(rest) => Violation("unit", s"a unit after {$n}: '${rest.trim.take(20)}' — the value has its own") }
-        digits ++ names ++ unitAfter ++ missing ++ unused ++ typed.collect { case (_, Left(v)) => v }
+        digits ++ names ++ unitAfter ++ worded.take(1) ++ missing ++ unused ++ typed.collect { case (_, Left(v)) => v }
 
   private def code(why: String): String =
     if why.startsWith("unknown handle") then "handle"
@@ -67,3 +70,14 @@ object Validator:
     val ws = Words.split(name)
     val tw = Words.split(text)
     ws.nonEmpty && tw.indices.exists(i => tw.slice(i, i + ws.size) == ws)
+
+  /** the beginnings of comparative words in the four languages: cheaper, more expensive, earlier, later, longer,
+   * shorter, fits (a budget) */
+  val comparatives: Vector[String] = Vector("tańsz", "taniej", "droższ", "drożej", "wcześniej", "późniejsz", "dłuższ",
+    "dłużej", "krótsz", "krócej", "mieści", "zmieści", "cheaper", "pricier", "earlier", "longer", "shorter", "дешевш",
+    "дорожч", "дешевле", "дороже", "раньше", "раніше", "довше", "дольше", "коротше", "короче", "вміщ", "уклад")
+
+  /** the first comparative word of a text, if any */
+  def comparative(text: String): Option[String] =
+    val words = Words.split(text)
+    words.find(w => comparatives.exists(c => w.startsWith(Words.norm(c))))

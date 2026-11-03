@@ -135,6 +135,9 @@ object Icu:
     case Part.Lit(_) => Vector.empty
   }.distinct
 
+  /** the message's own text outside every select and plural: where a claim in words has no boolean behind it */
+  def topTexts(parts: Vector[Part]): Vector[String] = parts.collect { case Part.Lit(t) => t }
+
   /** the message's own text, every case of it: what the validator scans for digits and names */
   def texts(parts: Vector[Part]): Vector[String] = parts.flatMap {
     case Part.Lit(t) => Vector(t)
