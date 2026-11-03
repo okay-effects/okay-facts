@@ -27,3 +27,18 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   3. okay-mall: the table in R2 (read on an isolate's first request; the host from its blobs' file), the turn
      decision in `ChatObject` (lane/intent/confidence logged), the Directory's semantic scorer; the 150-turn set and
      the measurement; deploy; verify-apex 27/27.
+- [ ] **router lane, round 2** (BACKLOG "The router lane, next"; operator 2026-11-03) — accuracy, cold start, the TCK
+  with `case`, the modes bug, measured again on a NEW frozen held-out set. Plan:
+  1. Error analysis of every miss of measure/2026-11-03 (intent, slots), by cause → okay-mall measure/2026-11-04/.
+  2. Held-out set (≥200 new turns, another author, 4 languages, out-of-domain and adversarial) written and FROZEN
+     (its sha256) before any tuning; tuning only on the old 180 + dev 45 + the intents' examples (train/dev).
+  3. Data first (okay-shop assistant/intents.json: phrasings, negatives for `other`, typos, no diacritics,
+     transliterations, mixed language, short follow-ups), then features/rules (combined slots+service+time, price
+     limits, parts of the day; `When`: weekend, "в пятницу", "після 16", "after 4pm"; masters in any case); the
+     threshold calibrated for router precision ≥ 97% on dev (§16).
+  4. The no-data branches: modes without modes → its own authored answer; every intent × missing data tested.
+  5. Cold start: where the 0.9 s goes (fetch, copies, F16, JSON of the probe), then the fix (128 wide / int8 /
+     zero-copy / cache / prewarm) — target < 150 ms CPU, first answer p50 < 1 s, ≤ 1 point accuracy lost.
+  6. TCK again (deepseek-v4.1-flash-1017, gpt-oss-120b, newer tool+JSON models), passports in §16.
+  7. Releases (okay-facts, okay-shop; okay-serverless if touched) under 0.1.0, okay-mall deployed, verify-apex 27/27;
+     the measurement on the held-out set (auto / model / usual), §14.6 a new dated row beside the old.
