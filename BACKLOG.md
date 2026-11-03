@@ -4,8 +4,8 @@ Stages in order; each is specified in specs/design.md §14 (what, done-when). Pr
 before starting it. Stages 1–5 are done (SPRINT.md).
 
 6. **measure** (in SPRINT with the router lane) — usual (data in context) vs okay-facts on the same TCK
-   questions and model: wrong prices, slots, bookings, tokens, latency (§14.6). The TCK's runner gives the okay-facts lane; the usual lane needs a prompt with
-   `tck.Demo`'s rows as text and a checker of its free text against the data.
+   questions and model: wrong prices, slots, bookings, tokens, latency (§14.6). The TCK's runner gives the
+   okay-facts lane; the usual lane needs a prompt with the rows as text and a checker of its free text.
 7. **demo, proxy, MCP, importers** — §13, §11, §4.
 
 Found while building (2026-11-03):
