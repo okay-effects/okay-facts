@@ -32,11 +32,16 @@ object Nearest:
   def semantic(table: Table, units: Vector[Array[Float]], name: String): Double =
     table.encode(name).fold(0.0)(n => units.map(Table.dot(_, n)).maxOption.getOrElse(0.0))
 
-  /** every candidate's score, the best first: 0.6 its meaning's nearness, 0.4 its words' presence */
+  /** every candidate's score, the best first, by its best name: every word of the name in the text — 0.75, and a
+   * quarter of its meaning's nearness more; else its meaning's nearness, or half of it and half of its words' share
+   * when that is more (the table's single words are noisy across languages: words first, meaning beside them) */
   def rank(table: Table, text: String, cs: Vector[Candidate]): Vector[(String, Double)] =
     val units = Table.units3(text).flatMap(table.vector)
-    cs.map(c => c.key -> c.names.filter(_.nonEmpty).map(n => 0.6 * semantic(table, units, n) + 0.4 *
-      lexical(text, n)).maxOption.getOrElse(0.0)).sortBy(-_._2)
+    def score(n: String): Double =
+      val lex = lexical(text, n)
+      val sem = semantic(table, units, n)
+      if lex >= 0.999 then 0.75 + 0.25 * math.max(sem, 0.0) else math.max(0.5 * lex + 0.5 * sem, sem)
+    cs.map(c => c.key -> c.names.filter(_.nonEmpty).map(score).maxOption.getOrElse(0.0)).sortBy(-_._2)
 
   /** one when the best passes `threshold` and leads the next by `margin`; several when two or more pass and are
    * closer than that; else nothing */
