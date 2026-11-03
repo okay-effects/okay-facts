@@ -81,3 +81,13 @@ class WorkersAiSuite extends munit.FunSuite:
       scala.collection.mutable.Buffer.empty)(WorkersAi.llm("m")(program)))))
     assertEquals(r.rendered.map(_.text), Some("Cześć!"))
     assertEquals(waited - Demo.now, 2000L)
+
+  test("a model that fails: its fallback asked"):
+    val s = Setup(Demo.schema, "A fictional barber's assistant.", Level.L3)
+    val program = Emit.none(Audit.ignore(Bind.turn[B](s, Conversation(), "Hej", Lang.pl, "mall")))
+    val seen = scala.collection.mutable.Buffer.empty[Json]
+    val out = Vector(Left("AiError: 8005: Internal server error"),
+      Right(Json.obj("response" -> Json.obj("params" -> Json.obj(), "template" -> Json.str("Cześć!")))))
+    val (_, (_, r)) = run(Demo.facts(None)(Clock.virtual(Demo.now)(answers(out, seen)(
+      WorkersAi.llm("first", Some("second"))(program)))))
+    assertEquals(r.rendered.map(_.text), Some("Cześć!"))

@@ -57,8 +57,9 @@ object WorkersAi:
             arguments(c("arguments")))) }.getOrElse(Vector.empty))
     (r, tokensIn, tokensOut)
 
-  /** `Llm` by the binding: each generation one `Ai` call of `model` (or the one an ask names) */
-  def llm[R[_], Rest[_], A](model: String)(p: A ! R)(using Split[Llm, R, Rest], In[Ai, Rest],
+  /** `Llm` by the binding: each generation one `Ai` call of `model` (or the one an ask names); a model that fails
+   * (busy past its limit's retries, an error) asked of `fallback`, when there is one */
+  def llm[R[_], Rest[_], A](model: String, fallback: Option[String] = None)(p: A ! R)(using Split[Llm, R, Rest], In[Ai, Rest],
     In[okay.scala3.std.Clock, Rest]): A ! Rest =
     // the per-minute limit of a model (3021): asked again twice, 2 and 5 seconds later
     def attempt(m: String, in: Json, waits: List[Long]): Either[String, Json] ! Rest =
@@ -75,7 +76,10 @@ object WorkersAi:
       case Llm.Count(a) => k(a.messages.map(_.render.length).sum / 4)
       case Llm.Start(a) =>
         val m = a.model.getOrElse(model)
-        attempt(m, input(m, a), List(2000L, 5000L)).flatMap { res =>
+        attempt(m, input(m, a), List(2000L, 5000L)).flatMap {
+          case Left(_) if fallback.exists(_ != m) => attempt(fallback.get, input(fallback.get, a), List(2000L))
+          case other => pure(other)
+        }.flatMap { res =>
           ids += 1
           val f = res match
             case Left(why) => Finished(Reply(s"error: $why", "", Vector.empty), Timing(0, 0, 0, 0), byStop = false)
