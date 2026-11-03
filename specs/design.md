@@ -386,6 +386,47 @@ Each stage: spec section first, tests, then code; done-when is the gate.
    router's answers pass the validator in every language in tests; the measurement of stage 6 (§14.6) recorded with
    the router lane in it; deployed on every shop with the model lane behind it.
 
+### 14.6 Measured (2026-11-03: the router lane, the model lane, the usual way)
+
+`okay-mall`'s `Measure` (its `measure/turns.jsonl`: 180 fictional turns — pl 69, uk 35, ru 35, en 41 — over six demo
+shops and the mall's home, 15 of them for the model: advice, payments, rule-breaking; `measure/dev.jsonl`, 45 others,
+was the one debugged by). The mall on `MemoryCloud` with its demo tenants, now Wednesday 2026-11-04 09:00 Warsaw;
+the model `deepseek-v4.1-flash-1017` (fallback `gpt-oss-120b`) through Workers AI (the TCK's Worker on `wrangler
+dev`). `auto`: as deployed — the router, the model behind it; `model`: the model lane alone; `usual`: the same model
+with the shop's data as text in its prompt (services, prices, durations, masters, hours, the week's free starts —
+the prompt published beside the results, `usual.md`), answering freely. Wrong facts: a price, a duration, a time or
+a master's name in an answer that the data does not have (checked by code, each flag then read by a person).
+
+| lane | answered by the router | wrong facts | tokens a turn | cost a turn | latency p50 / p95 |
+|---|---|---|---|---|---|
+| auto (router, model behind) | 154 of 180 (86%) | 0 | 820 | $0.00031 | 12 ms / 12.3 s |
+| model lane alone | — | 0 | 6 212 | $0.00229 | 9.4 s / 31.0 s |
+| usual (data in the prompt) | — | 0 (3 flagged: "every 15 minutes", "under 300 zł" — not wrong) | 5 308 | $0.00175 | 3.7 s / 17.4 s |
+
+- **The router**: answered 154 turns (pl 61/69, uk 33/35, ru 32/35, en 28/41); its intent right in 137 of them
+  (89%); of the 15 turns meant for the model, 12 declined, 3 answered (a request to break the rule answered with a
+  price — every value still the resolver's); 14 in-domain turns declined to the model (not confident, `other`), 14
+  answered with another intent (most: a mall-wide search taken for `masters`, an area question for `address`).
+  Slots right: 114 of 143 asked (80%) — the service among the shop's, the day, the time, the master, the city, the
+  price limit; a bare "strzyżenie" where a shop has three asked back ("which one?") on purpose. In the router's own
+  time: p50 10 ms, p95 41 ms (in-process); on production, end to end through the Worker, the conversation's object and
+  the shops' objects: 0.5–0.9 s warm, ~3 s for a new conversation's first answer (its object's isolate reads the
+  table: 0.9 s of CPU). The model behind it, for what the router declined: p50 8.3 s.
+- **Wrong facts: 0 in every lane.** The usual way made none on this small, clean data either — the six demo shops
+  fit the prompt whole; the difference okay-facts guarantees (no value can be wrong; only a reference) is
+  structural, and the usual way's errors grow with the data (§13: a large catalogue, data changed after loading,
+  similar names). What the router changes is the cost and the time: 7.5 times fewer tokens a turn than the model
+  lane, an answer in milliseconds for most turns.
+- The model lane was slower than on production (6.7 s) because the account's per-minute limit was shared by the
+  runs; its expected values were shown in 178 of 180 answers (auto 173: the router's wrong intents; usual 167, its
+  values in its own formats, "75 min" for "1 godzina 15 minut").
+- **The table**: okay-chat's static table (5 363 units, a marketplace's) knew 52.5% of the set's words (pl 48.6%,
+  uk 49.4%, ru 43.2%, en 64.1%; 6 turns with no known word); the shop domain's table built for this (13 163 units:
+  the intents' examples' words, pairs and triples, okay-shop's `assistant/vocabulary.txt`, MASSIVE's pl/ru/en words
+  seen three times or more — CC BY 4.0) knows 87.2% (pl 86.4%, uk 81.3%, ru 84.6%, en 93.1%; 1 turn with none).
+  256 wide (PCA keeps 99.3% of the variance; 128 wide would keep 92.7% with the same held-out intent accuracy),
+  7.1 MB in half precision. The probe on held-out authored rows (every 5th): 92% right, 94% among the confident.
+
 ## 15. Gotchas
 
 - Non-unique links make paths wrong silently (an averaged value belonging to nobody): enforce functionality.
@@ -467,6 +508,30 @@ Each stage: spec section first, tests, then code; done-when is the gate.
 - **Streaming**: params-first streaming is in the library (`Stream`, `Emit`; tested on the fake port); the Workers AI
   port answers whole (okay-serverless' `Ai` returns the whole JSON), so the mall renders after the answer.
 - **Stage 6 (measure)** not done yet: BACKLOG.
+
+### The router lane (decided while implementing, 2026-11-03; §17)
+
+- **Where things live**: okay-facts — the generic module `okay-facts-router` (rules, `Table`, `Probe`, `Detect`,
+  `When`, `Amount`, `Nearest`, `Spell` — names across scripts and forms), `Morph` and the case hints in the core,
+  `Bind.authored`, the tools; okay-shop — the shop's intents, phrasings, answers, vocabulary, the table and the probe
+  as data (`assistant/`), `ShopRouter`; okay-mall — the turn decision in `ChatObject`, the table in R2, the
+  Directory's semantic scorer, the measurement. okay-chat-edge unchanged.
+- **The table** is the shop domain's own (okay-chat's knew half the words, §14.6), distilled by `tools/table.scala`
+  from the model file okay-chat fetched (onnxruntime 1.30 and the HuggingFace tokenizer on the JVM; never Python).
+  Single words are noisy across languages in it ("haircut" ~ "strzyżenie" 0.09, "haircut" ~ "manicure" 0.49 after
+  centring): a service is found by its names' words first (the shops' names are in four languages), the meaning beside
+  them (0.85 of the cosine alone; ties of the same words asked). It is read in place: its labels kept in their bytes'
+  order and searched where they lie (no map of 13 000 units built at an isolate's start).
+- **Thresholds**: a route is confident by a rule, or by the probe at p ≥ 0.6 and a margin ≥ 0.2 (held-out authored
+  rows: 94% right among the confident); a service at 0.6 and a lead of 0.06 (0.75 — all its words — when a
+  follow-up would otherwise take the conversation's). A class `other` (advice, payments, amenities, rule-breaking) is
+  the model's.
+- **Names in their cases**: the model lane's prompt asks a case for a person's name and the validator's `case` holds
+  it to it (§17); `tck.Demo`'s masters are persons too. Rules for Polish, Ukrainian and Russian first names; a Latin
+  name in a Cyrillic sentence, two words, an unknown ending: the nominative in a construction needing no case.
+- **Worker limits** (2026-11: 64 MiB uncompressed, no compressed limit, 1 s to start, 128 MB an isolate): the mall's
+  Worker is 7.0 MB (1.13 MB gzipped; +90 KB for the router's data and code), starting in 35–50 ms; the table is not
+  in it but in R2, read once an isolate.
 
 ## 17. The router lane (operator, 2026-11-03: a lane with no generative model in front of the model lane)
 

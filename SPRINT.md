@@ -16,7 +16,9 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   (okay-shop specs/shop.md "The assistant", `AssistantSuite`); released okay-shop 0.1.0.
 - [x] **okay-mall chat** (stage 5) — `ChatObject`, the cookie, focus, `MallFacts`, `ChatGuard`, per-shop switch,
   audit and dashboard; §12's flow on MemoryCloud, wrangler dev, production (every shop and the landing, 2026-11-03).
-- [ ] **router lane** (stage 8, §17; operator 2026-11-03) and **measure** (stage 6, §14.6) — in flight. Plan, in order:
+- [x] **router lane** (stage 8, §17; operator 2026-11-03) and **measure** (stage 6, §14.6) — done 2026-11-03: released
+  okay-facts 0.1.0 (with okay-facts-router) and okay-shop 0.1.0, deployed on every shop of the mall and its home;
+  §14.6 measured (the router 86% of 180 turns, 0 wrong facts in every lane). Plan, as it went:
   1. okay-facts: module `router` (`Re`/`Rules` portable, `Table` F16 in place, `Probe`, `Detect`, `When`, `Amount`,
      `Nearest`, `Router`); core `Morph` + case hints + validator `case` + `Bind.authored` + `Audited.Routed`; tools
      `table.scala`, `fit.scala`, `coverage.scala`; tests both platforms; release 0.1.0 (republished).

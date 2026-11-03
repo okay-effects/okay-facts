@@ -17,7 +17,7 @@ import scala.jdk.CollectionConverters.*
 @main def coverage(turns: String, tables: String*): Unit =
   val rows = Files.readAllLines(Paths.get(turns)).asScala.toVector.map(Json.fromText)
     .filter(_.field("text").isDefined).map(j => (j("text").string, j("lang").string))
-  for f <- tables do
+  for f <- tables.filterNot(_.startsWith("--")) do
     val t = Table(Files.readAllBytes(Paths.get(f)))
     println(s"$f: ${t.size} units × ${t.dim}")
     for (l, xs) <- rows.groupBy(_._2).toVector.sortBy(_._1) :+ ("all" -> rows) do

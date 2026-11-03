@@ -3,9 +3,8 @@
 Stages in order; each is specified in specs/design.md §14 (what, done-when). Promote the next one to SPRINT.md
 before starting it. Stages 1–5 are done (SPRINT.md).
 
-6. **measure** (in SPRINT with the router lane) — usual (data in context) vs okay-facts on the same TCK
-   questions and model: wrong prices, slots, bookings, tokens, latency (§14.6). The TCK's runner gives the
-   okay-facts lane; the usual lane needs a prompt with the rows as text and a checker of its free text.
+6. **measure** — done with the router lane (SPRINT, §14.6). Next: the same on a large catalogue and on data changed
+   after loading (§13), where the usual way's errors are expected.
 7. **demo, proxy, MCP, importers** — §13, §11, §4.
 
 Found while building (2026-11-03):
@@ -22,3 +21,7 @@ Found while building (2026-11-03):
    solutions as resolver facts with proofs: `require` / `prefer` / `solve` in `Expr`, a Datalog handler (the shops'
    rules), SAT / weighted MaxSAT with UNSAT cores as explanations, the model's hints ordering the search, intent
    facts apart from data facts. specs/design.md §18.
+- **The router lane, next** (§14.6, §16): wrong intents among the router's answers (14 of 165 in-domain turns: a
+  mall-wide search taken for `masters`, an area question for `address`) and ordinary questions sent to `other` —
+  more phrasings and a new held-out set; the table 128 wide (half the bytes to read in a new isolate); a modes
+  question in a shop without modes says the address's absence (`ShopRouter.one`'s fallback) — its own answer.
