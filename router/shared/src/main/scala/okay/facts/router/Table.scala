@@ -11,10 +11,11 @@ import okay.effects.json.Json
  * A safetensors file read from its bytes IN PLACE: `vecs` (F16 `[n, dim]`) stays where it lies, a row decoded when a
  * text uses it; `labels.offsets` (U64) and `labels.bytes` (U8) the units; `weights` (F64)
  */
-final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int,
-                           labels: java.util.HashMap[String, Integer], val dim: Int, val meta: Map[String, String]):
-  def size: Int = labels.size
-  def has(unit: String): Boolean = labels.containsKey(unit)
+final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int, offsAt: Int, labelsAt: Int, n: Int,
+                           labels: Option[java.util.HashMap[String, Integer]], val dim: Int,
+                           val meta: Map[String, String]):
+  def size: Int = n
+  def has(unit: String): Boolean = row(unit).isDefined
 
   private inline def u16(at: Int): Int = (bytes(at) & 0xff) | ((bytes(at + 1) & 0xff) << 8)
 
@@ -27,9 +28,24 @@ final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int,
     Table.normalised(v)
   }
 
-  private def row(unit: String): Option[Int] =
-    val r = labels.get(unit)
-    if r == null then None else Some(r.intValue)
+  /** a unit's row: by binary search over the labels' bytes where they lie (a file's labels in order — the writer's),
+   * else by a map made at the start */
+  private def row(unit: String): Option[Int] = labels match
+    case Some(m) =>
+      val r = m.get(unit)
+      if r == null then None else Some(r.intValue)
+    case None =>
+      val key = unit.getBytes(UTF_8)
+      var lo = 0
+      var hi = n - 1
+      var found = -1
+      while found < 0 && lo <= hi do
+        val mid = (lo + hi) >>> 1
+        val c = Table.compare(key, bytes, labelsAt + start(mid), labelsAt + start(mid + 1))
+        if c == 0 then found = mid else if c < 0 then hi = mid - 1 else lo = mid + 1
+      Option.when(found >= 0)(found)
+
+  private inline def start(i: Int): Int = Table.le64(bytes, offsAt + 8 * i).toInt
 
   private def add(row: Int, w: Double, acc: Array[Float]): Unit =
     val at = vecsAt + row * dim * 2
@@ -55,7 +71,7 @@ final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int,
   /** the share of a text's words the table knows */
   def coverage(text: String): Double =
     val ws = Table.tokens(text)
-    if ws.isEmpty then 1.0 else ws.count(labels.containsKey).toDouble / ws.size
+    if ws.isEmpty then 1.0 else ws.count(has).toDouble / ws.size
 
 object Table:
   /** the table from a safetensors file's bytes (kept, not copied) */
@@ -73,23 +89,51 @@ object Table:
     val (oa, ob) = range("labels.offsets")
     val (la, _) = range("labels.bytes")
     val n = (ob - oa) / 8 - 1
-    val m = new java.util.HashMap[String, Integer](n * 2)
-    var i = 0
-    var start = le64(bytes, oa).toInt
-    while i < n do
-      val end = le64(bytes, oa + 8 * (i + 1)).toInt
-      m.put(new String(bytes, la + start, end - start, UTF_8), i)
-      start = end
+    def at(i: Int) = la + le64(bytes, oa + 8 * i).toInt
+    // the labels in their bytes' order (the writer's): read where they lie; else a map, made once
+    var sorted = true
+    var i = 1
+    while sorted && i < n do
+      sorted = compareIn(bytes, at(i - 1), at(i), at(i), at(i + 1)) < 0
       i += 1
+    val labels = Option.when(!sorted) {
+      val m = new java.util.HashMap[String, Integer](n * 2)
+      var j = 0
+      while j < n do
+        m.put(new String(bytes, at(j), at(j + 1) - at(j), UTF_8), j)
+        j += 1
+      m
+    }
     val dim = meta.get("dim").flatMap(_.toIntOption).getOrElse(header("vecs")("shape").list(1).int)
-    new Table(bytes, va, wa, m, dim, meta)
+    new Table(bytes, va, wa, oa, la, n, labels, dim, meta)
+
+  /** a key's bytes against bytes `[from, until)` of `b`, unsigned, lexicographic */
+  def compare(key: Array[Byte], b: Array[Byte], from: Int, until: Int): Int =
+    val len = until - from
+    var i = 0
+    var c = 0
+    while c == 0 && i < key.length && i < len do
+      c = (key(i) & 0xff) - (b(from + i) & 0xff)
+      i += 1
+    if c != 0 then c else key.length - len
+
+  private def compareIn(b: Array[Byte], a0: Int, a1: Int, b0: Int, b1: Int): Int =
+    var i = 0
+    var c = 0
+    while c == 0 && a0 + i < a1 && b0 + i < b1 do
+      c = (b(a0 + i) & 0xff) - (b(b0 + i) & 0xff)
+      i += 1
+    if c != 0 then c else (a1 - a0) - (b1 - b0)
 
   /** a table's safetensors file: the units, their vectors (each `dim` long, kept in half precision), their weights,
    * the metadata (`dim` added) — the build's writer (`tools/table.scala`), and tests' */
   def write(units: Vector[String], vecs: Vector[Array[Float]], weights: Vector[Double],
             meta: Map[String, String]): Array[Byte] =
     val dim = vecs.headOption.map(_.length).getOrElse(0)
-    val labels = units.map(_.getBytes(UTF_8))
+    val bs = units.map(_.getBytes(UTF_8))
+    val order = units.indices.toVector.sortWith((x, y) => compare(bs(x), bs(y), 0, bs(y).length) < 0)
+    // the units in their bytes' order: a reader searches them where they lie
+    val labels = order.map(bs)
     val vecBytes = units.size * dim * 2
     val offBytes = (units.size + 1) * 8
     val labBytes = labels.map(_.length).sum
@@ -109,12 +153,12 @@ object Table:
     def u64(n: Long): Unit = (0 until 8).foreach(i => out.write(((n >>> (8 * i)) & 0xff).toInt))
     u64(header.length)
     out.write(header)
-    for v <- vecs; x <- v do { val h = toHalf(x); out.write(h & 0xff); out.write((h >>> 8) & 0xff) }
+    for v <- order.map(vecs); x <- v do { val h = toHalf(x); out.write(h & 0xff); out.write((h >>> 8) & 0xff) }
     var at = 0L
     u64(0)
     for l <- labels do { at += l.length; u64(at) }
     labels.foreach(out.write)
-    for w <- weights do u64(java.lang.Double.doubleToLongBits(w))
+    for w <- order.map(weights) do u64(java.lang.Double.doubleToLongBits(w))
     out.toByteArray
 
   def le64(b: Array[Byte], at: Int): Long =
