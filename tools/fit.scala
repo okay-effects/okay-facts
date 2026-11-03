@@ -14,7 +14,8 @@
 /**
  * THE PROBE, FITTED (okay-facts specs/design.md §17) on the intents' examples over the table, and held-out numbers to
  * choose the thresholds by: every 5th example left out, the probe fitted on the rest, the left-out routed (rules
- * first, as the router does); the share right, and right among the confident at each threshold. Then the probe on
+ * first, as the router does); the share right, and, at each threshold, what the router would answer (confident, not
+ * `other`) and how much of it is right. Then the probe on
  * every example, written.
  *   scala-cli run tools/fit.scala -- <intents.json> <table.safetensors> <out probe.json>
  */
@@ -36,11 +37,14 @@ import java.nio.file.{Files, Paths}
     s"(by rule ${routed.count(_._2.by == "rule")}, unknown ${routed.count(_._2.by == "unknown")})")
   for (l, xs) <- routed.groupBy(_._3).toVector.sortBy(_._1.ordinal) do
     println(s"  $l: ${xs.count((i, r, _) => r.intent == i)} / ${xs.size}")
-  for p <- Seq(0.3, 0.4, 0.5, 0.6, 0.7, 0.8); m <- Seq(0.1, 0.2, 0.3) do
-    val conf = routed.filter(_._2.confident(p, m))
-    println(f"  p >= $p%.1f, margin >= $m%.1f: confident ${conf.size}%3d of ${routed.size}, right " +
-      f"${conf.count((i, r, _) => r.intent == i)}%3d (${100.0 * conf.count((i, r, _) => r.intent == i) /
-        math.max(conf.size, 1)}%.1f%%)")
+  // the thresholds: what the router would ANSWER (confident, not `other` — `other` is the model's) and how much of it
+  // is right; of what is not `other`, the share answered
+  for p <- Seq(0.4, 0.5, 0.6, 0.7, 0.8, 0.9); m <- Seq(0.1, 0.2, 0.3, 0.5) do
+    val answered = routed.filter((_, r, _) => r.confident(p, m) && r.intent != "other")
+    val right = answered.count((i, r, _) => r.intent == i)
+    val domain = routed.count(_._1 != "other")
+    println(f"  p >= $p%.1f, margin >= $m%.1f: answered ${answered.size}%3d (${100.0 * answered.size / math.max(domain,
+      1)}%.1f%% of $domain not other), right $right%3d (${100.0 * right / math.max(answered.size, 1)}%.1f%%)")
   routed.filter((i, r, _) => r.intent != i).foreach((i, r, l) => println(s"  wrong: $l $i → ${r.intent} (${r.by}, " +
     f"${r.p}%.2f)"))
   val probe = Router.fit(table, intents)

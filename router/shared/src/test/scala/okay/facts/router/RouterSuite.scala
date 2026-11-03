@@ -32,6 +32,19 @@ class RouterSuite extends munit.FunSuite:
       "kosztuje strzyżenie", "ile kosztuje strzyżenie"))
     for x <- Seq(0.0f, 1.0f, -0.5f, 0.333f, 1e-5f) do assert(math.abs(Table.half(Table.toHalf(x)) - x) < 1e-3, x)
 
+  test("the table in int8 (a byte a dimension, a scale a row), read in place from a buffer's view"):
+    def v(xs: Double*) = Table.normalised(xs.map(_.toFloat).toArray)
+    val units = Vector("haircut", "strzyżenie", "broda", "beard")
+    val vecs = Vector(v(0, 0.05, 1, 0), v(0, 0, 1, 0), v(0, 0, 0, 1), v(0, 0, 0.1, 1))
+    val file = Table.write(units, vecs, units.map(_ => 1.0), Map("enc" -> "toy8"), int8 = true)
+    // a view into a larger buffer, as a platform's memory gives it: the table from the view's position
+    val padded = new Array[Byte](file.length + 13)
+    System.arraycopy(file, 0, padded, 5, file.length)
+    val t = Table(java.nio.ByteBuffer.wrap(padded, 5, file.length))
+    assertEquals((t.size, t.dim, t.meta.get("enc")), (4, 4, Some("toy8")))
+    for (u, x) <- units.zip(vecs) do assert(Table.dot(t.vector(u).get, x) > 0.999, u)
+    assert(math.abs(Table.dot(t.vector("haircut").get, t.vector("strzyżenie").get) - 0.9988) < 0.01)
+
   val intents: Vector[Intent] = Intents.parse("""{"intents": [
     {"name": "greet", "rank": 10, "rules": ["\\b(?:cześć|hello)\\b"]},
     {"name": "price", "examples": {"pl": ["ile kosztuje", "cena"], "en": ["price"]}},
@@ -83,6 +96,14 @@ class RouterSuite extends munit.FunSuite:
     assertEquals(day("November 12"), Some("2026-11-12"))
     assertEquals(day("2 stycznia"), Some("2027-01-02"))
     assertEquals(day("ile kosztuje"), None)
+    // the weekend: its Saturday; words typed in Latin letters for Cyrillic ones
+    for t <- Seq("na weekend", "w weekend", "на вихідних", "на выходных", "this weekend") do
+      assertEquals(day(t), Some("2026-11-07"), t)
+    assertEquals(day("zavtra"), Some("2026-11-04"))
+    assertEquals(day("v pyatnicu"), Some("2026-11-06"))
+    assertEquals(day("u pjatnycju"), Some("2026-11-06"))
+    assertEquals(day("v subbotu"), Some("2026-11-07"))
+    assertEquals(day("segodnya vecherom"), Some(today))
 
   test("times: exact, from, until; parts of the day; a price is never a time"):
     def w(t: String) = When.of(t, today)
@@ -105,6 +126,11 @@ class RouterSuite extends munit.FunSuite:
     assertEquals(w("na 2 osoby").at, None)
     assertEquals(w("za 45 minut").at, None)
     assertEquals(w("do 150").until, None)
+    assertEquals(w("posle 16").from, Some(16 * 60))
+    assertEquals(w("pislya 16").from, Some(16 * 60))
+    assertEquals(w("v 10 utra").at, Some(10 * 60))
+    assertEquals(w("zavtra vecherom").from, Some(17 * 60))
+    assertEquals(w("Macie jutro wolne na brodę po 16?").from, Some(16 * 60))
 
   test("price limits in four languages; a small number without a currency is a time's"):
     def max(t: String) = Amount.of(t).max
@@ -121,6 +147,7 @@ class RouterSuite extends munit.FunSuite:
     assertEquals(max("do 20 zł"), Some(2000L))
     assertEquals(Amount.of("od 100 zł").min, Some(10000L))
     assertEquals(Amount.of("jutro o 17").isEmpty, true)
+    assertEquals(max("deshevle 100 zlotyh"), Some(10000L))
 
   test("the nearest candidates: one, several too close to tell, none"):
     val cs = Vector(Nearest.Candidate("cut", Vector("Strzyżenie", "Haircut")),
@@ -133,3 +160,25 @@ class RouterSuite extends munit.FunSuite:
     assertEquals(Nearest.pick(Nearest.rank(toy, "qwerty", cs), 0.5, 0.1), Nearest.Pick.Nothing)
     assertEquals(Nearest.pick(Vector("a" -> 0.8, "b" -> 0.78, "c" -> 0.3), 0.5, 0.1),
       Nearest.Pick.Several(Vector("a", "b")))
+
+  test("the nearest: a word by its rarity among the candidates, by the host's lexicon, typed in Latin letters"):
+    val shop = Vector(Nearest.Candidate("cut", Vector("Strzyżenie męskie", "Мужская стрижка", "Men's haircut")),
+      Nearest.Candidate("beard", Vector("Broda", "Борода", "Beard")),
+      Nearest.Candidate("combo", Vector("Strzyżenie + broda", "Стрижка + борода", "Haircut + beard")),
+      Nearest.Candidate("kids", Vector("Strzyżenie dziecięce", "Детская стрижка", "Kids' haircut")))
+    val lex = Lexicon.parse("""{"groups": [["dziec", "syn", "syna", "córk", "kid", "child", "son", "детск", "ребен",
+      "сын"],
+      ["strzyż", "strzyc", "ostrzy", "стриж", "стриг", "haircut"]]}""")
+    // the haircut with a beard: the name that accounts for both words, not the beard alone
+    assertEquals(Nearest.rank(toy, "Стрижка с бородой", shop, lex).head._1, "combo")
+    assertEquals(Nearest.pick(Nearest.rank(toy, "a haircut and beard", shop, lex), 0.6, 0.06),
+      Nearest.Pick.One("combo", Nearest.rank(toy, "a haircut and beard", shop, lex).head._2))
+    assertEquals(Nearest.rank(toy, "broda", shop, lex).head._1, "beard")
+    // a son's haircut: the children's, by the lexicon
+    assertEquals(Nearest.rank(toy, "Za ile ostrzyżecie syna?", shop, lex).head._1, "kids")
+    // in Latin letters for a Cyrillic name
+    assert(Nearest.same("strizhka", "стрижка"))
+    assertEquals(Nearest.lexical("skolko stoit borodu", "Борода"), 1.0)
+    // the rarer word counts more: "męskie" says which, "strzyżenie" every haircut has
+    assertEquals(Nearest.lexical("strzyżenie męskie", "Strzyżenie męskie", weight = _ => 0.5), 1.0)
+    assert(Nearest.lexical("męskie", "Strzyżenie męskie", weight = w => if w == "meskie" then 1 else 1.0 / 3) > 0.7)

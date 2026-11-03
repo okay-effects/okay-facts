@@ -10,25 +10,35 @@ final case class When(day: Option[String] = None, from: Option[Int] = None, unti
 
 /**
  * DAYS AND TIMES IN WORDS (specs/design.md §17), Polish, Ukrainian, Russian, English, relative to today in Warsaw:
- * today, tomorrow, the day after, a weekday (the next one, today included), `5.11`, `5 listopada`, `November 5`; a part
- * of the day; `o 17`, `na 10:30`, `о 10`, `в 10`, `at 5pm` (exact), `po 17`, `після 17`, `after 5` (from), `przed 12`,
- * `до 12`, `before 12` (until), a bare `17:30`. An hour of 1 to 7 without `am` is the afternoon's (`po 5` is 17:00).
- * A number with a currency after it is a price, never a time. The text is matched lower case, diacritics off
+ * today, tomorrow, the day after, a weekday (the next one, today included), the weekend (its Saturday), `5.11`,
+ * `5 listopada`, `November 5`; a part of the day; `o 17`, `na 10:30`, `о 10`, `в 10`, `at 5pm` (exact), `po 17`,
+ * `після 17`, `after 5` (from), `przed 12`, `до 12`, `before 12` (until), a bare `17:30`. An hour of 1 to 7
+ * without `am` is the afternoon's (`po 5` is 17:00). A number with a currency after it is a price, never a time. The
+ * text is matched lower case, diacritics off;
+ * Ukrainian and Russian words typed in Latin letters too ("zavtra", "v pyatnicu posle 16")
  */
 object When:
   private def r(p: String) = Rules.compile(p)
+  private def words(ws: String*) = r(s"\\b(?:${ws.mkString("|")})\\b")
 
-  private val dayAfter = r("\\b(?:pojutrze|day after tomorrow|післязавтра|послезавтра|после завтра)\\b")
-  private val tomorrow = r("\\b(?:jutro|jutra|tomorrow|tmrw|завтра|завтрашн\\w*)\\b")
-  private val today = r("\\b(?:dzis|dzisiaj|dzisiejsz\\w*|today|tonight|сьогодні|сегодня|сегодняшн\\w*)\\b")
+  // each with its spellings in Latin letters too ("zavtra", "v pyatnicu"): a message typed without Cyrillic
+  private val dayAfter = words("pojutrze", "day after tomorrow", "післязавтра", "послезавтра", "после завтра",
+    "poslezavtra", "pislyazavtra", "pisliazavtra")
+  private val tomorrow = words("jutro", "jutra", "tomorrow", "tmrw", "tmr", "завтра", "завтрашн\\w*", "zavtra")
+  private val today = words("dzis", "dzisiaj", "dzisiejsz\\w*", "today", "tonight", "сьогодні", "сегодня",
+    "сегодняшн\\w*", "segodnya", "segodnia", "sevodnya", "sohodni", "sogodni")
+  /** the weekend: its Saturday (or today, on a Saturday or Sunday) */
+  private val weekend = words("weekend\\w*", "weeknd", "na weekendzie", "вихідн\\w*", "выходн\\w*", "vyhodn\\w*",
+    "vykhodn\\w*", "vihidn\\w*", "vykhidn\\w*")
   private val weekdays: Vector[(Int, Re)] = Vector(
-    1 -> "poniedzialek|poniedzialku|понеділок|понеділка|понедельник|понедельника|monday|mon",
-    2 -> "wtorek|wtorku|вівторок|вівторка|вторник|вторника|tuesday|tue|tues",
-    3 -> "sroda|srode|srody|середа|середу|середи|среда|среду|среды|wednesday|wed",
-    4 -> "czwartek|czwartku|четвер|четверга|четверг|thursday|thu|thurs",
-    5 -> "piatek|piatku|п'?ятниц\\w*|friday|fri",
-    6 -> "sobota|sobote|soboty|субота|суботу|суботи|суббота|субботу|субботы|saturday|sat",
-    7 -> "niedziela|niedziele|niedzieli|неділя|неділю|неділі|воскресенье|воскресенья|sunday|sun")
+    1 -> "poniedzialek|poniedzialku|понеділок|понеділка|понедельник|понедельника|monday|mon|ponedelnik\\w*|ponedilok",
+    2 -> "wtorek|wtorku|вівторок|вівторка|вторник|вторника|tuesday|tue|tues|vtornik\\w*|vivtorok",
+    3 -> "sroda|srode|srody|середа|середу|середи|среда|среду|среды|wednesday|wed|sred[auy]|sered[auy]",
+    4 -> "czwartek|czwartku|четвер|четверга|четверг|thursday|thu|thurs|chetverg\\w*|chetver",
+    5 -> "piatek|piatku|п'?ятниц\\w*|friday|fri|p'?[yj]?atnic\\w*|p'?[yj]?atnyc\\w*",
+    6 -> "sobota|sobote|soboty|субота|суботу|суботи|суббота|субботу|субботы|saturday|sat|subbot\\w*|subot\\w*",
+    7 -> ("niedziela|niedziele|niedzieli|неділя|неділю|неділі|воскресенье|воскресенья|sunday|sun|voskresen\\w*|" +
+      "nedil\\w*"))
     .map((d, p) => d -> r(s"\\b(?:$p)\\b"))
 
   private val months: Vector[String] = Vector(
@@ -44,20 +54,23 @@ object When:
   private val numeric = r("\\b([0-3]?\\d)[./]([01]?\\d)\\b(?![.:/]\\d)")
 
   private val morning = r("\\b(?:rano|rana|z rana|przed poludniem|przedpoludniem|morning|зранку|вранці|ранку|" +
-    "утром|утра|с утра|до обеда|до обіду)\\b")
+    "утром|утра|с утра|до обеда|до обіду|utrom|utra|s utra|zranku|vranci|vrantsi|do obeda|do obidu)\\b")
   private val afternoon = r("\\b(?:po poludniu|popoludniu|popoludnie|afternoon|після обіду|по обіді|вдень|удень|днем|" +
-    "после обеда|в обед|w poludnie)\\b")
+    "после обеда|в обед|w poludnie|posle obeda|pislya obidu|pislia obidu|dnem|vden)\\b")
   private val evening = r("\\b(?:wieczorem|wieczor|wieczora|evening|tonight|ввечері|увечері|ввечері|вечора|вечір|" +
-    "вечером|вечера|вечер)\\b")
+    "вечером|вечера|вечер|vecherom|vechera|vecher|uvecheri|vvecheri|vechorom)\\b")
 
   private val currency = "\\s*(?:zl|pln|zlotych|zloty|zlote|злот\\w*|зл|eur|euro|€|\\$|usd|грн|руб\\w*)"
   private val hhmm = "(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.)?"
-  private val atTime = r(s"\\b(?:o|na|at|about|around|okolo|ok|о|об|в|во|на|к|біля|около)\\s+(?:godz\\w*\\s+)?$hhmm" +
+  private val atTime = r(s"\\b(?:o|na|at|about|around|okolo|ok|о|об|в|во|на|к|біля|около|v|vo|ob|kolo)" +
+    s"\\s+(?:godz\\w*\\s+)?$hhmm" +
     s"(?!\\d|$currency|\\s*(?:min|minut|хв|мин|osob|раз))")
-  private val fromTime = r(s"\\b(?:po|od|after|from|since|later than|після|з|від|после|с|от|позже)\\s+" +
+  private val fromTime = r(s"\\b(?:po|od|after|from|since|later than|після|з|від|после|с|от|позже|" +
+    "posle|pislya|pislia|pisla|vid|ot|nie wczesniej niz|not before)\\s+" +
     "(?:godz\\w*\\s+)?" +
     s"$hhmm(?!\\d|$currency|\\s*(?:min|minut|хв|мин))")
-  private val untilTime = r(s"\\b(?:przed|do|before|until|till|by|до|перед|раньше|раніше)\\s+(?:godz\\w*\\s+)?$hhmm" +
+  private val untilTime = r(s"\\b(?:przed|do|before|until|till|by|до|перед|раньше|раніше|pered|ranshe|ranishe|" +
+    s"nie pozniej niz|no later than)\\s+(?:godz\\w*\\s+)?$hhmm" +
     s"(?!\\d|$currency|\\s*(?:min|minut|хв|мин))")
   private val bare = r("\\b(\\d{1,2}):(\\d{2})\\b")
 
@@ -83,7 +96,8 @@ object When:
       else if tomorrow.test(t) then Some(Zone.plus(today0, 1))
       else if today.test(t) then Some(today0)
       else dated(t, today0).orElse(weekdays.find(_._2.test(t)).map((d, _) =>
-        Zone.plus(today0, Math.floorMod(d - Zone.weekday(today0), 7))))
+        Zone.plus(today0, Math.floorMod(d - Zone.weekday(today0), 7)))).orElse(Option.when(weekend.test(t))(
+        if Zone.weekday(today0) == 7 then today0 else Zone.plus(today0, Math.floorMod(6 - Zone.weekday(today0), 7))))
     val part = if morning.test(t) then Some("morning") else if afternoon.test(t) then Some("afternoon")
       else if evening.test(t) then Some("evening") else None
     val at = first(atTime, t).orElse(bare.all(t).headOption.flatMap((_, _, g) => minutes(g(0), g(1), "")))

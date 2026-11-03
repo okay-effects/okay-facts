@@ -568,26 +568,37 @@ every language, and the validator runs on the router's answers at runtime as on 
   escape is refused, so a construct the translation does not know is seen, not mistranslated.
 - **The static table** (`Table`): a vector per unit — a word, two or three adjacent words — distilled from
   paraphrase-multilingual-MiniLM-L12-v2 (model2vec's method with okay-chat's teacher, okay's `Static`), cut by PCA,
-  half precision, with SIF weights; a text's vector is the weighted mean of its known units', normalised — a lookup
-  and a sum, no inference. A safetensors file (`vecs` F16 `[n, dim]`, `labels.offsets` U64, `labels.bytes` U8,
-  `weights` F64), read from its bytes in place: a row is decoded when a text uses it. Its coverage (the share of a
-  text's words it knows) is reported.
+  with SIF weights; a text's vector is the weighted mean of its known units', normalised — a lookup and a sum, no
+  inference. A safetensors file (`vecs` I8 `[n, dim]` with `scales` F32 `[n]` — a byte a dimension, a row its bytes
+  times its scale, the largest magnitude over 127 — or F16 `[n, dim]`; `labels.offsets` U64, `labels.bytes` U8,
+  `weights` F64), read IN PLACE from a buffer over its bytes (`java.nio.ByteBuffer`: on the JVM over an array, in a
+  Worker a view of the object's own `ArrayBuffer` by okay-serverless' `Blobs.view` — never copied): a row is decoded
+  when a text uses it. Its coverage (the share of a text's words it knows) is reported.
 - **The probe** (`Probe`): multinomial logistic regression over the table's vectors (okay's `Probe`: weights from
   zero, rows in order, 300 epochs, rate 0.5 — deterministic), fitted at BUILD time by a tool; the host carries the
   weights (JSON, classes × dim).
 - **Language** (`Detect`): the message's script (any Cyrillic letter: Cyrillic), then letters only one language has
   and everyday words; an amount with its currency counts for none («do 150 zł» is not Polish); no evidence: the
   conversation's last language within the script, else the page's.
-- **Slots, generic** — `When`: a day (today, tomorrow, the day after, a weekday, `5.11`, `5 listopada`), a part of
-  the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`, `до 12`, `after 5pm`) in pl, uk, ru,
-  en, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`, `under
-  150`, `max 150`); `Nearest`: the candidates nearest a text in the table (each unit of the text against each
-  candidate's name, in any of its languages), with a threshold and a margin — two close: ambiguous, the host asks.
+- **Slots, generic** — `When`: a day (today, tomorrow, the day after, a weekday, the weekend — its Saturday —,
+  `5.11`, `5 listopada`), a part of the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`,
+  `до 12`, `after 5pm`) in pl, uk, ru, en — Ukrainian and Russian typed in Latin letters too (`zavtra`, `v pyatnicu
+  posle 16`) —, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`,
+  `under 150`, `max 150`, `deshevle 100`); `Nearest`: the candidates nearest a text (each unit of the text against
+  each candidate's name, in any of its languages): its words first — a name's word present in the text by its form
+  (`near`: the same, a start of 4 letters, a stem in common, one edit), in plain Latin (`Spell.fold`: "strizhka" is
+  "стрижка"), or by the host's `Lexicon` (groups of stems of one thing — "szafa", "meble", "wardrobe", "шкаф"; a
+  verb's prefix passed over: "po|czyścić"; a stem of 3 letters the whole word only; words that say nothing of which
+  service it is ignored: "drobna", "small", "telefon"), each word weighed by its rarity among the candidates (1 over
+  how many have it) —, its meaning beside them; a name with all its words wins by the text's words it accounts for
+  ("haircut and beard" is the haircut with a beard, not the beard); a threshold and a margin — two close:
+  ambiguous, the host asks.
 - **The router** (`Router`): the intents' rules first (in rank order), then the probe over the message's vector →
   `Route(intent, by: rule | probe | unknown, p, margin)`; `confident` when by a rule, or `p` and the margin pass the
   host's thresholds (calibrated on held-out authored rows, recorded in §16).
 - **The data** (`Intents`): `{intents: [{name, rank, rules: [...], examples: {pl: [...], uk: [...], ru: [...],
-  en: [...]}}]}` — a host's own file; the probe is fitted on its examples, the table distilled over its units.
+  en: [...]}}]}` — a host's own file; the probe is fitted on its examples, the table distilled over its units. The
+  `Lexicon` (`{groups: [[stems…]…], ignore: [words…]}`) is the host's too.
 - **Tools** (`tools/`, scala-cli, never Python): `table.scala` (the units of a corpus embedded by the ONNX encoder —
   onnxruntime and the HuggingFace tokenizer on the JVM, the model file okay-chat fetches —, PCA, F16, the file
   written), `fit.scala` (the probe), `coverage.scala` (a table's coverage of a set of texts).

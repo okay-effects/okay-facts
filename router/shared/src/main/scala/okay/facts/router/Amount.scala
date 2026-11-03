@@ -18,7 +18,8 @@ object Amount:
   private val cur = "(\\s*(?:zl|pln|zlotych|zloty|zlote|злот\\w*|зл))?"
   private val strong = "ponizej|taniej niz|tansze niz|tanszy niz|nie drozej niz|nie wiecej niz|maks\\w*|max|under|" +
     "below|less than|cheaper than|up to|no more than|at most|не дорожче|дешевше|менше ніж|менше|максимум|в межах|" +
-    "не дороже|дешевле|меньше|в пределах|до"
+    "не дороже|дешевле|меньше|в пределах|до|deshevle|deshevshe|ne dorozhe|ne dorozhche|v predelah|v mezhah|" +
+    "najwyzej|za max|budzet|budget|бюджет"
   private val maxAfter = r(s"\\b(?:$strong|do)\\s*$num$cur")
   private val maxBefore = r(s"\\b$num$cur\\s*(?:max|maks\\w*|максимум|top|at most)\\b")
   private val minAfter = r(s"\\b(?:od|powyzej|drozej niz|over|above|more than|from|от|від|понад|больше|більше)" +

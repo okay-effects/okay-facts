@@ -13,11 +13,13 @@
  * THE STATIC TABLE, DISTILLED (okay-facts specs/design.md §17): every unit of a corpus — the words, pairs and triples
  * of the intents' examples, the words of vocabularies and word lists — embedded ONCE by the sentence encoder
  * (paraphrase-multilingual-MiniLM-L12-v2 through onnxruntime on the JVM: mean over the positions, unit length), cut by
- * PCA to `--dim`, weighted by SIF over the corpus' frequencies, written as safetensors (vectors in half precision).
+ * PCA to `--dim`, weighted by SIF over the corpus' frequencies, written as safetensors (vectors in half precision, or
+ * with `--int8` a byte a dimension and a scale a row).
  * The encodings are cached (`--cache`), so another cut is a second's work.
  *
  *   scala-cli run tools/table.scala -- --model <dir with model.onnx, tokenizer.json> --out <file.safetensors>
- *     [--intents <intents.json>]… [--words <file>]… [--massive <dir> [--massive-min 3]] [--dim 256] [--cache <file>]
+ *     [--intents <intents.json>]… [--words <file>]… [--massive <dir> [--massive-min 3]] [--dim 256] [--int8]
+ *     [--cache <file>]
  */
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import ai.onnxruntime.{OnnxTensor, OrtEnvironment, OrtSession}
@@ -33,6 +35,7 @@ import scala.jdk.CollectionConverters.*
   val model = Paths.get(one("--model").getOrElse(sys.error("--model <dir>")))
   val out = Paths.get(one("--out").getOrElse(sys.error("--out <file>")))
   val dim = one("--dim").map(_.toInt).getOrElse(256)
+  val int8 = args.contains("--int8")
   val massiveMin = one("--massive-min").map(_.toInt).getOrElse(3)
 
   // ---- the corpus: texts whose units go in (examples: words, pairs, triples), word lists (words only)
@@ -71,7 +74,7 @@ import scala.jdk.CollectionConverters.*
   val weights = units.map(u => 1e-3 / (1e-3 + counts.getOrElse(u, 1.0) / total))
   val kept = variance(rows, mean, basis)
   Files.write(out, Table.write(units, projected, weights, Map("encoder" -> "paraphrase-multilingual-MiniLM-L12-v2",
-    "format" -> "1", "count" -> units.size.toString, "pca" -> dim.toString, "variance" -> f"$kept%.3f")))
+    "format" -> "1", "count" -> units.size.toString, "pca" -> dim.toString, "variance" -> f"$kept%.3f"), int8))
   println(s"written $out: ${units.size} units × $dim, ${Files.size(out)} bytes, variance kept ${"%.3f".format(kept)}")
 
 /** every text through the encoder: mean over the positions, unit length (okay-onnx's `Encoder`) */

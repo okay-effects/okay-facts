@@ -1,25 +1,29 @@
 package okay.facts.router
 
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import okay.effects.json.Json
 
 /**
  * THE STATIC TABLE (specs/design.md §17): a vector per unit — a word, two or three adjacent words — distilled from a
- * sentence encoder (paraphrase-multilingual-MiniLM-L12-v2, okay's `Static`), cut by PCA, half precision, with a SIF
- * weight. A text's vector is its known units' weighted mean, normalised: a lookup and a sum, no inference.
+ * sentence encoder (paraphrase-multilingual-MiniLM-L12-v2, okay's `Static`), cut by PCA, with a SIF weight. A text's
+ * vector is its known units' weighted mean, normalised: a lookup and a sum, no inference.
  *
- * A safetensors file read from its bytes IN PLACE: `vecs` (F16 `[n, dim]`) stays where it lies, a row decoded when a
- * text uses it; `labels.offsets` (U64) and `labels.bytes` (U8) the units; `weights` (F64)
+ * A safetensors file read from its bytes IN PLACE — a buffer over them, never copied (in a Worker: a view of the
+ * object's own `ArrayBuffer`): `vecs` (I8 `[n, dim]` with `scales` F32 `[n]` — a row is its bytes times its scale —,
+ * or F16 `[n, dim]`) stays where it lies, a row decoded when a text uses it; `labels.offsets` (U64) and
+ * `labels.bytes` (U8) the units, in their bytes' order; `weights` (F64)
  */
-final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int, offsAt: Int, labelsAt: Int, n: Int,
-                           labels: Option[java.util.HashMap[String, Integer]], val dim: Int,
+final class Table private (buf: ByteBuffer, vecsAt: Int, int8: Boolean, scalesAt: Int, weightsAt: Int, offsAt: Int,
+                           labelsAt: Int, n: Int, labels: Option[java.util.HashMap[String, Integer]], val dim: Int,
                            val meta: Map[String, String]):
   def size: Int = n
   def has(unit: String): Boolean = row(unit).isDefined
 
-  private inline def u16(at: Int): Int = (bytes(at) & 0xff) | ((bytes(at + 1) & 0xff) << 8)
+  private inline def b(at: Int): Int = buf.get(at) & 0xff
+  private inline def u16(at: Int): Int = b(at) | (b(at + 1) << 8)
 
-  private def weight(row: Int): Double = java.lang.Double.longBitsToDouble(Table.le64(bytes, weightsAt + 8 * row))
+  private def weight(row: Int): Double = java.lang.Double.longBitsToDouble(Table.le64(buf, weightsAt + 8 * row))
 
   /** a unit's vector, or none */
   def vector(unit: String): Option[Array[Float]] = row(unit).map { r =>
@@ -41,19 +45,25 @@ final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int, offs
       var found = -1
       while found < 0 && lo <= hi do
         val mid = (lo + hi) >>> 1
-        val c = Table.compare(key, bytes, labelsAt + start(mid), labelsAt + start(mid + 1))
+        val c = Table.compare(key, buf, labelsAt + start(mid), labelsAt + start(mid + 1))
         if c == 0 then found = mid else if c < 0 then hi = mid - 1 else lo = mid + 1
       Option.when(found >= 0)(found)
 
-  private inline def start(i: Int): Int = Table.le64(bytes, offsAt + 8 * i).toInt
+  private inline def start(i: Int): Int = Table.le64(buf, offsAt + 8 * i).toInt
 
   private def add(row: Int, w: Double, acc: Array[Float]): Unit =
-    val at = vecsAt + row * dim * 2
     var i = 0
-    while i < dim do
-      acc(i) = acc(i) + (Table.half(u16(at + 2 * i)) * w).toFloat
-      i += 1
-
+    if int8 then
+      val at = vecsAt + row * dim
+      val s = java.lang.Float.intBitsToFloat(Table.le32(buf, scalesAt + 4 * row)) * w
+      while i < dim do
+        acc(i) = acc(i) + (buf.get(at + i) * s).toFloat
+        i += 1
+    else
+      val at = vecsAt + row * dim * 2
+      while i < dim do
+        acc(i) = acc(i) + (Table.half(u16(at + 2 * i)) * w).toFloat
+        i += 1
   /** a text's vector: its units' weighted mean, normalised — or none, no unit of it known */
   def encode(text: String): Option[Array[Float]] = encodeUnits(Table.units3(text))
 
@@ -73,11 +83,20 @@ final class Table private (bytes: Array[Byte], vecsAt: Int, weightsAt: Int, offs
     val ws = Table.tokens(text)
     if ws.isEmpty then 1.0 else ws.count(has).toDouble / ws.size
 
+
 object Table:
   /** the table from a safetensors file's bytes (kept, not copied) */
-  def apply(bytes: Array[Byte]): Table =
-    val headerLen = le64(bytes, 0).toInt
-    val header = Json.fromText(new String(bytes, 8, headerLen, UTF_8))
+  def apply(bytes: Array[Byte]): Table = apply(ByteBuffer.wrap(bytes))
+
+  /** the table from a buffer over a safetensors file's bytes, from its position to its limit (kept, not copied: a
+   * view of a platform's memory reads in place) */
+  def apply(whole: ByteBuffer): Table =
+    val buf = whole.slice()
+    val headerLen = le64(buf, 0).toInt
+    val headerBytes = new Array[Byte](headerLen)
+    var h = 0
+    while h < headerLen do { headerBytes(h) = buf.get(8 + h); h += 1 }
+    val header = Json.fromText(new String(headerBytes, UTF_8))
     val base = 8 + headerLen
     def range(name: String): (Int, Int) =
       val offs = header(name)("data_offsets").list.map(_.long.toInt)
@@ -85,92 +104,128 @@ object Table:
     val meta = header.field("__metadata__").collect { case Json.Obj(fs) => fs.collect { case (k, Json.Str(v)) =>
       k -> v }.toMap }.getOrElse(Map.empty)
     val (va, _) = range("vecs")
+    val int8 = header("vecs")("dtype").string == "I8"
+    val sa = if int8 then range("scales")._1 else 0
     val (wa, _) = range("weights")
     val (oa, ob) = range("labels.offsets")
     val (la, _) = range("labels.bytes")
     val n = (ob - oa) / 8 - 1
-    def at(i: Int) = la + le64(bytes, oa + 8 * i).toInt
+    def at(i: Int) = la + le64(buf, oa + 8 * i).toInt
     // the labels in their bytes' order (the writer's): read where they lie; else a map, made once
     var sorted = true
     var i = 1
     while sorted && i < n do
-      sorted = compareIn(bytes, at(i - 1), at(i), at(i), at(i + 1)) < 0
+      sorted = compareIn(buf, at(i - 1), at(i), at(i), at(i + 1)) < 0
       i += 1
     val labels = Option.when(!sorted) {
       val m = new java.util.HashMap[String, Integer](n * 2)
       var j = 0
       while j < n do
-        m.put(new String(bytes, at(j), at(j + 1) - at(j), UTF_8), j)
+        val bs = new Array[Byte](at(j + 1) - at(j))
+        var k = 0
+        while k < bs.length do { bs(k) = buf.get(at(j) + k); k += 1 }
+        m.put(new String(bs, UTF_8), j)
         j += 1
       m
     }
     val dim = meta.get("dim").flatMap(_.toIntOption).getOrElse(header("vecs")("shape").list(1).int)
-    new Table(bytes, va, wa, oa, la, n, labels, dim, meta)
+    new Table(buf, va, int8, sa, wa, oa, la, n, labels, dim, meta)
 
   /** a key's bytes against bytes `[from, until)` of `b`, unsigned, lexicographic */
-  def compare(key: Array[Byte], b: Array[Byte], from: Int, until: Int): Int =
+  def compare(key: Array[Byte], b: ByteBuffer, from: Int, until: Int): Int =
     val len = until - from
     var i = 0
     var c = 0
     while c == 0 && i < key.length && i < len do
-      c = (key(i) & 0xff) - (b(from + i) & 0xff)
+      c = (key(i) & 0xff) - (b.get(from + i) & 0xff)
       i += 1
     if c != 0 then c else key.length - len
 
-  private def compareIn(b: Array[Byte], a0: Int, a1: Int, b0: Int, b1: Int): Int =
+  private def compareIn(b: ByteBuffer, a0: Int, a1: Int, b0: Int, b1: Int): Int =
     var i = 0
     var c = 0
     while c == 0 && a0 + i < a1 && b0 + i < b1 do
-      c = (b(a0 + i) & 0xff) - (b(b0 + i) & 0xff)
+      c = (b.get(a0 + i) & 0xff) - (b.get(b0 + i) & 0xff)
       i += 1
     if c != 0 then c else (a1 - a0) - (b1 - b0)
 
-  /** a table's safetensors file: the units, their vectors (each `dim` long, kept in half precision), their weights,
-   * the metadata (`dim` added) — the build's writer (`tools/table.scala`), and tests' */
+  private def compareBytes(a: Array[Byte], b: Array[Byte]): Int =
+    var i = 0
+    var c = 0
+    while c == 0 && i < a.length && i < b.length do
+      c = (a(i) & 0xff) - (b(i) & 0xff)
+      i += 1
+    if c != 0 then c else a.length - b.length
+
+  /** a table's safetensors file: the units, their vectors (each `dim` long — in half precision, or `int8`: each row
+   * a byte per dimension and its scale, the largest magnitude over 127), their weights, the metadata (`dim` added) —
+   * the build's writer (`tools/table.scala`), and tests' */
   def write(units: Vector[String], vecs: Vector[Array[Float]], weights: Vector[Double],
-            meta: Map[String, String]): Array[Byte] =
+            meta: Map[String, String], int8: Boolean = false): Array[Byte] =
     val dim = vecs.headOption.map(_.length).getOrElse(0)
     val bs = units.map(_.getBytes(UTF_8))
-    val order = units.indices.toVector.sortWith((x, y) => compare(bs(x), bs(y), 0, bs(y).length) < 0)
+    val order = units.indices.toVector.sortWith((x, y) => compareBytes(bs(x), bs(y)) < 0)
     // the units in their bytes' order: a reader searches them where they lie
     val labels = order.map(bs)
-    val vecBytes = units.size * dim * 2
+    val vecBytes = units.size * dim * (if int8 then 1 else 2)
+    val scaleBytes = if int8 then units.size * 4 else 0
     val offBytes = (units.size + 1) * 8
     val labBytes = labels.map(_.length).sum
     val wBytes = units.size * 8
+    // the vectors, the scales (4-aligned after the vectors), the offsets 8-aligned: padding between them
+    val padV = Math.floorMod(-vecBytes, 8)
+    val padS = Math.floorMod(-(vecBytes + padV + scaleBytes), 8)
     // the weights 8-aligned after the labels' bytes: padded with spaces in the header
     def json(pad: Int): String =
-      val a = vecBytes; val b = a + offBytes; val c = b + labBytes; val d = c + wBytes
+      val a = vecBytes; val s0 = a + padV; val s1 = s0 + scaleBytes; val b0 = s1 + padS
+      val b = b0 + offBytes; val c = b + labBytes; val cw = c + Math.floorMod(-labBytes, 8); val d = cw + wBytes
       val m = (meta + ("dim" -> dim.toString)).toVector.sortBy(_._1).map((k, v) => s"\"$k\":\"$v\"").mkString(",")
-      s"""{"__metadata__":{$m},"vecs":{"dtype":"F16","shape":[${units.size},$dim],"data_offsets":[0,$a]},""" +
-        s""""labels.offsets":{"dtype":"U64","shape":[${units.size + 1}],"data_offsets":[$a,$b]},""" +
+      s"""{"__metadata__":{$m},"vecs":{"dtype":"${if int8 then "I8" else "F16"}","shape":[${units.size},$dim],""" +
+        s""""data_offsets":[0,$a]},""" +
+        (if int8 then s""""scales":{"dtype":"F32","shape":[${units.size}],"data_offsets":[$s0,$s1]},""" else "") +
+        s""""labels.offsets":{"dtype":"U64","shape":[${units.size + 1}],"data_offsets":[$b0,$b]},""" +
         s""""labels.bytes":{"dtype":"U8","shape":[$labBytes],"data_offsets":[$b,$c]},""" +
-        s""""weights":{"dtype":"F64","shape":[${units.size}],"data_offsets":[$c,$d]}}""" + " " * pad
+        s""""weights":{"dtype":"F64","shape":[${units.size}],"data_offsets":[$cw,$d]}}""" + " " * pad
     val bare = json(0).getBytes(UTF_8).length
     val pad = Math.floorMod(-(8 + bare), 8)
     val header = json(pad).getBytes(UTF_8)
     val out = java.io.ByteArrayOutputStream()
     def u64(n: Long): Unit = (0 until 8).foreach(i => out.write(((n >>> (8 * i)) & 0xff).toInt))
+    def u32(n: Int): Unit = (0 until 4).foreach(i => out.write((n >>> (8 * i)) & 0xff))
+    def zeros(k: Int): Unit = (0 until k).foreach(_ => out.write(0))
     u64(header.length)
     out.write(header)
-    for v <- order.map(vecs); x <- v do { val h = toHalf(x); out.write(h & 0xff); out.write((h >>> 8) & 0xff) }
+    if int8 then
+      val rows = order.map(vecs)
+      val scales = rows.map(v => math.max(v.map(math.abs).maxOption.getOrElse(0f), 1e-12f) / 127f)
+      for (v, s) <- rows.zip(scales); x <- v do out.write(math.max(-127, math.min(127, math.round(x / s))) & 0xff)
+      zeros(padV)
+      scales.foreach(s => u32(java.lang.Float.floatToIntBits(s)))
+    else
+      for v <- order.map(vecs); x <- v do { val h = toHalf(x); out.write(h & 0xff); out.write((h >>> 8) & 0xff) }
+      zeros(padV)
+    zeros(padS)
     var at = 0L
     u64(0)
     for l <- labels do { at += l.length; u64(at) }
     labels.foreach(out.write)
+    zeros(Math.floorMod(-labBytes, 8))
     for w <- order.map(weights) do u64(java.lang.Double.doubleToLongBits(w))
     out.toByteArray
 
-  def le64(b: Array[Byte], at: Int): Long =
+  def le64(b: ByteBuffer, at: Int): Long =
     var r = 0L
     var i = 7
     while i >= 0 do
-      r = (r << 8) | (b(at + i) & 0xffL)
+      r = (r << 8) | (b.get(at + i) & 0xffL)
       i -= 1
     r
 
-  /** half precision to single: all 65 536 values, made once */
-  private val halves: Array[Float] =
+  def le32(b: ByteBuffer, at: Int): Int =
+    (b.get(at) & 0xff) | ((b.get(at + 1) & 0xff) << 8) | ((b.get(at + 2) & 0xff) << 16) | ((b.get(at + 3) & 0xff) << 24)
+
+  /** half precision to single: all 65 536 values, made once (when a half-precision table is first read) */
+  private lazy val halves: Array[Float] =
     val t = new Array[Float](65536)
     var h = 0
     while h < 65536 do
