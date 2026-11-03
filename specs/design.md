@@ -411,9 +411,54 @@ Each stage: spec section first, tests, then code; done-when is the gate.
   candidates with tool calling; the default is chosen by the passport. Strict mode on production needs L3 (tool
   calls + JSON schema); with no model reaching L3 reliably, the best one with policy `regenerate` — said so here.
 
+### Decided while implementing (2026-11-03)
 
-- Library name and repository: `okay-facts` (private or public — the operator decides; the product name for
-  businesses may differ).
-- Which Workers AI model reaches L3 reliably (stage 3 decides).
-- Whether the chat widget is part of okay-shop's pages' script or a separate script.
-- Retention of conversations and the client's data in `ChatObject` (GDPR: purpose, period, deletion on request).
+- **Repository**: `okay-facts`, public (okay-effects/okay-facts), Apache-2.0; artifacts `okay-facts` (the core and the
+  binding, JVM and Scala.js) and `okay-facts-cloud` (the Workers AI binding as okay-llm's `Llm` port). okay-llm got a
+  Scala.js platform and `Ask.format` (a response format; the old `apply`/`copy` kept), republished under 0.1.0.
+- **The widget** is part of okay-shop's pages' script (`site.js`), active only where the page carries its marker
+  (`Look.chat`); a page without the marker is byte for byte as before.
+- **Retention**: the operator's 30 days (above); built in okay-mall's `ChatObject`.
+- **The model** — the TCK (§11) on Workers AI, 36 questions over `tck.Demo` (pl, uk, ru, en; prices, durations, slots,
+  masters, places, ratings, comparisons, absences, actions, a flow across three shops, users asking to break the
+  rule), the final run with the library as released (the claim check of worded comparisons in; `tck/worker/run.sh`):
+
+  (passed — the expectations met; strict — with no violation nor regeneration; formatted — the final answer as
+  the level asks; tools — tool calls used; entities — the finds that reached the expected ones; per question.)
+
+  - `deepseek-v4.1-flash-1017`, run at L3: reached **L3**; passed 35/36, strict 31, formatted 35, tools 36;
+    violations claim 1, digits 3, name 1, parse 1; 5 regenerations; entities 13/13; 5 273 tokens, 6.7 s.
+  - `gpt-oss-120b`, L3: **L3**; 31/36, strict 30, formatted 35, tools 31; name 1; 1 regeneration; 12/13; 4 252
+    tokens, 12.3 s.
+  - `glm-5.3-flash`, L3: **L2** (formatted 32/36); 31/36, strict 28, tools 33; name 3; 3; 12/13; 4 728 tokens, 32.9 s.
+  - `llama-3.3-70b-instruct-fp8-fast`, L3: **L3**; 23/36, strict 17, formatted 36, tools 35; digits 4, handle 8,
+    name 2, parse 2, placeholder 2, syntax 1, type 3, unused 2; 10; 9/13; 8 394 tokens, 11.0 s.
+  - `deepseek-v4.1-flash-1017`, L0 (markers, command lines): **L0**; 30/36, strict 24; claim 10, digits 19, name 3;
+    16 regenerations; 13/13; 3 990 tokens, 7.6 s.
+  - `llama-3.3-70b-instruct-fp8-fast`, L0: **L0**; 19/36, strict 11; claim 6, digits 17, handle 8, name 6, parse 13,
+    type 2; 31; 11/13; 4 786 tokens, 6.5 s.
+
+  Earlier runs of the day (the resolver before its last fixes; L3): deepseek-v4.1-flash 36/36 and 34/36, glm-5.3-flash
+  32/36 and 33/36, nemotron-3-120b 22/36 (L0), gemma-4-26b 20/36 (L2), qwen3-30b 19/36 (L0), qwen3.8-27b 4/36,
+  mistral-small-3.1 1/36 (L2: no JSON answer), llama-4-scout 3/36 (tool calls written as text: L0; 20/36 run at L0).
+  **Chosen: deepseek-v4.1-flash-1017** (`CHAT_MODEL`), L3, policy `regenerate`; the fallback **gpt-oss-120b** (L3).
+  Strict mode (no regeneration, 90% strict) is reached by no model reliably — deepseek 31–34 of 36 strict across
+  three runs: production runs L3 with `regenerate`, as the operator said for this case. Cost: about 5 300 tokens a
+  question, $0.30 / $1.20 per million in / out (≈ $0.002 an answer). Notes: gpt-oss works only in the chat shape
+  (its Responses shape refuses tools through the binding); a model's per-minute limit (`3021`) is retried by the port.
+
+### Implementation notes (2026-11-03)
+
+- **Find** is generous with what models write: a link filtered by a handle, by a name (`service = haircut`) or by a
+  path (`shop.city = Kraków`, `city(shop) = Kraków`); an expression over handles as a value (`price < price(#v1)`);
+  a bare number against money or minutes in its main unit; text matched on words of 3 letters or more, the best
+  matches only (a row with half the words where another has them all is dropped). Visible descriptors never carry a
+  digit (an owner's description "3 seats" is a fact).
+- **Claims in words**: a comparative word (cheaper, earlier, longer, fits — pl, uk, ru, en stems) in the template's
+  own text outside a select is a violation (`claim`): the comparison must be an expression whose boolean chooses the
+  words. A stem list, not a grammar: "less"/"more" are not in it (too common) — a known gap.
+- **Names in their cases**: the resolver renders a name as the data has it ("u Marek" where Polish wants "u Marka");
+  forms by case from the data are not built.
+- **Streaming**: params-first streaming is in the library (`Stream`, `Emit`; tested on the fake port); the Workers AI
+  port answers whole (okay-serverless' `Ai` returns the whole JSON), so the mall renders after the answer.
+- **Stage 6 (measure)** not done yet: BACKLOG.

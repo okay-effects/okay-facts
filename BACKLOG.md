@@ -1,14 +1,19 @@
 # BACKLOG — okay-facts
 
 Stages in order; each is specified in specs/design.md §14 (what, done-when). Promote the next one to SPRINT.md
-before starting it.
+before starting it. Stages 1–5 are done (SPRINT.md).
 
-1. **core** — metamodel, handles, expressions, `{params, template}`, ICU rendering with plurals (pl/uk/ru/en),
-   validator, fake model port. §4–§9.
-2. **binding** — the conversation loop over okay-llm ports, L0–L4 modes, streaming with `params` first, policies. §10.
-3. **tck** — the conformance suite and model passports; Workers AI candidates. §11.
-4. **okay-shop assistant** — the shop's fact schema, `find`/`open`/`book`, the widget (in okay-shop, released). §12.
-5. **okay-mall chat** — `ChatObject`, the mall-domain cookie, focus, mall-wide find, per-shop enabling (in
-   okay-mall). §12. Demo tenants only until the operator says otherwise.
-6. **measure** — usual (data in context) vs okay-facts. §14.6.
+6. **measure** — usual (data in context) vs okay-facts on the same TCK questions and model: wrong prices, slots,
+   bookings, tokens, latency (§14.6). The TCK's runner gives the okay-facts lane; the usual lane needs a prompt with
+   `tck.Demo`'s rows as text and a checker of its free text against the data.
 7. **demo, proxy, MCP, importers** — §13, §11, §4.
+
+Found while building (2026-11-03):
+
+- **Names in their cases** (Polish "u Marka", Ukrainian/Russian likewise): forms by case in the data, a hint
+  `name(master(#s1)) as gen`; until then the prompt avoids case-bound names.
+- **Worded claims beyond the stem list**: "less", "more", "mniej", "więcej" are not caught (too common); a better
+  check: a comparative next to a value's placeholder.
+- **Streaming through the Workers AI port**: needs okay-serverless' `Ai` to stream (`stream: true`); the library's
+  `Stream` is ready.
+- **Strict mode**: no Workers AI model reaches 90% strict (§16); revisit with new models by the TCK.
