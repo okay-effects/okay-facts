@@ -141,4 +141,8 @@ object Demo:
             case Some(Value.Entity(e)) => Table.get(rows, e, "url").map(f => Acted(Some(e), Map("url" -> f),
               card = Some(Card.Open(Render(f.value, Lang.pl), e.source)))).toRight("no such shop")
             case _ => Left("open takes a shop")
+          case "book" => args.get("slot") match
+            case Some(Value.Entity(e)) if e.cls == "Slot" => Table.get(rows, e, "time").map(f => Acted(card = Some(
+              Card.Book(e.key, "book", Vector(Render(f.value, Lang.pl)))))).toRight("no such slot")
+            case _ => Left("book takes a slot")
           case other => Left(s"no action $other here")))

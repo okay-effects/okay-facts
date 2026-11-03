@@ -35,29 +35,43 @@ object Rendered:
  * formatted in the user's language with the values in — or the violations, for the policy to decide
  */
 object Resolve:
-  def apply[R[_]](a: Answer, handles: Handles, schema: Schema, l: Lang)(using In[Facts, R])
+  /** rendered whatever the template's own words (policy `flag`): digits, names and units there are the model's, every
+   * value still the resolver's; none when a parameter itself is wrong */
+  def lenient[R[_]](a: Answer, handles: Handles, schema: Schema, l: Lang)(using In[Facts, R]): Option[Rendered] ! R =
+    apply(a, handles, schema, l, strict = false).map(_.toOption)
+
+  def apply[R[_]](a: Answer, handles: Handles, schema: Schema, l: Lang, strict: Boolean = true)(using In[Facts, R])
     : Either[Vector[Violation], Rendered] ! R =
-    val static = Validator.check(a, handles, schema)
+    val static = Validator.check(a, handles, schema).filter(v => strict || !Set("digits", "name", "unit")(v.code))
     if static.nonEmpty then pure(Left(static))
-    else
-      val parts = Icu.parse(a.template).toOption.get
-      val exprs = a.params.map((n, e) => n -> Expr.parse(e).toOption.get)
-      Eval.each(exprs)((n, x) => Eval(x, handles).flatMap {
-        case Left(why) => pure(Left(Violation(if boolType(x, handles, schema) == Type.Bool then "claim"
-          else "value", s"$n = ${Expr.show(x)}: $why")))
-        case Right(c) => chip(n, x, c, handles, l).map(ch => Right(n -> (c, ch)))
-      }).map {
-        case Left(v) => Left(Vector(v))
-        case Right(done) =>
-          val byName = done.toMap
-          val segs = Icu.format(parts, l, n => byName(n)._2.text, n => Render.plural(byName(n)._1.value),
-            n => byName(n)._1.value match
-              case Value.Bool(b) => b.toString
-              case Value.Text(t) => Value.in(t, l)
-              case Value.Num(x) => x.toString
-              case _ => "other")
-          Right(Rendered(segs, done.map(_._2._2), a))
-      }
+    else values[R](a.params, handles, schema, l).map {
+      case Left(v) => Left(Vector(v))
+      case Right(byName) => format(a, byName, l).toRight(Vector(Violation("syntax", "the template")))
+    }
+
+  /** every parameter evaluated (they type-check: the validator said so), with its chip; or the first that fails */
+  def values[R[_]](params: Vector[(String, String)], handles: Handles, schema: Schema, l: Lang)(using In[Facts, R])
+    : Either[Violation, Map[String, (Computed, Chip)]] ! R =
+    val exprs = params.map((n, e) => n -> Expr.parse(e))
+    exprs.collectFirst { case (n, Left(why)) => Violation("parse", s"$n: $why") } match
+      case Some(v) => pure(Left(v))
+      case None => Eval.each(exprs.collect { case (n, Right(x)) => n -> x })((n, x) => Eval(x, handles).flatMap {
+          case Left(why) => pure(Left(Violation(if boolType(x, handles, schema) == Type.Bool then "claim"
+            else "value", s"$n = ${Expr.show(x)}: $why")))
+          case Right(c) => chip(n, x, c, handles, l).map(ch => Right(n -> (c, ch)))
+        }).map(_.map(_.toMap))
+
+  /** the template formatted with the values: none when it does not parse or names a value not there */
+  def format(a: Answer, byName: Map[String, (Computed, Chip)], l: Lang): Option[Rendered] =
+    Icu.parse(a.template).toOption.filter(parts => Icu.names(parts).forall(byName.contains)).map { parts =>
+      val segs = Icu.format(parts, l, n => byName(n)._2.text, n => Render.plural(byName(n)._1.value),
+        n => byName(n)._1.value match
+          case Value.Bool(b) => b.toString
+          case Value.Text(t) => Value.in(t, l)
+          case Value.Num(x) => x.toString
+          case _ => "other")
+      Rendered(segs, a.params.flatMap((n, _) => byName.get(n).map(_._2)), a)
+    }
 
   private def boolType(x: Expr, handles: Handles, schema: Schema): Type =
     Expr.typeOf(x, handles, schema).getOrElse(Type.Text)
