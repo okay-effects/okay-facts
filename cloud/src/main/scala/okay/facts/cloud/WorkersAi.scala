@@ -13,31 +13,13 @@ import okay.serverless.cloud.Ai
  * `error: …` and the turn tells the user the assistant is unavailable
  */
 object WorkersAi:
-  /** the model's input for an ask: the chat's shape (gpt-oss: the Responses shape, its instructions apart) */
+  /** the model's input for an ask: the chat's shape — every model, gpt-oss too (its Responses shape refuses tools
+   * through the binding, 2026-11-03) */
   def input(model: String, a: Ask): Json =
-    if model.contains("gpt-oss") then
-      val (system, rest) = a.messages.partition(_("role") == Json.Str("system"))
-      Json.Obj(Vector("instructions" -> Json.str(system.map(_("content")).collect { case Json.Str(s) => s }
-        .mkString("\n\n")), "input" -> Json.Arr(rest.map(responsesItem)), "max_output_tokens" ->
-        Json.num(a.maxTokens), "reasoning" -> Json.obj("effort" -> Json.str("low"))) ++
-        (if a.tools.isEmpty then Vector.empty else Vector("tools" -> Json.Arr(a.tools.map(t => t.field("function")
-          .collect { case Json.Obj(fs) => Json.Obj(("type" -> Json.str("function")) +: fs) }.getOrElse(t))))) ++
-        a.format.flatMap(_.field("json_schema")).map(s => "text" -> Json.obj("format" -> Json.Obj(
-          ("type" -> Json.str("json_schema")) +: s.record))))
-    else Json.Obj(Vector("messages" -> Json.Arr(a.messages), "max_tokens" -> Json.num(a.maxTokens)) ++
+    Json.Obj(Vector("messages" -> Json.Arr(a.messages), "max_tokens" -> Json.num(a.maxTokens)) ++
       (if a.tools.isEmpty then Vector.empty else Vector("tools" -> Json.Arr(a.tools))) ++
       a.sampling.temperature.map("temperature" -> Json.num(_)) ++ a.sampling.seed.map("seed" -> Json.num(_)) ++
       a.format.map("response_format" -> _))
-
-  /** a chat message as a Responses item: tool calls and results as function calls and their outputs */
-  private def responsesItem(m: Json): Json = m("role") match
-    case Json.Str("tool") => Json.obj("type" -> Json.str("function_call_output"),
-      "call_id" -> m.field("tool_call_id").getOrElse(Json.str("call")), "output" -> m("content"))
-    case Json.Str("assistant") if m.field("tool_calls").isDefined =>
-      val c = m("tool_calls").list.head
-      Json.obj("type" -> Json.str("function_call"), "call_id" -> c.field("id").getOrElse(Json.str("call")),
-        "name" -> c("function")("name"), "arguments" -> c("function")("arguments"))
-    case _ => Json.obj("role" -> m("role"), "content" -> m("content"))
 
   private def text(x: Json): Option[String] = x match
     case Json.Str(s) => Some(s)

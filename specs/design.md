@@ -142,7 +142,7 @@ What the model writes inside `params`. Small, typed, evaluated only by the resol
 - **Paths** over links: `price(item(#order1))`, `city(address(#shop3))`. A path is exact only if every property on it
   is functional (keys/cardinality from the ontology or the overlay); otherwise the expression is rejected at
   validation, or typed as a set. (Why: a non-unique join averages two rows into a value that belongs to neither — see
-  the okay-circuits notes; `owl:FunctionalProperty` is the name of the condition.)
+  the okay-inlay notes; `owl:FunctionalProperty` is the name of the condition.)
 - **Aggregates**: `sum`, `min`, `max`, `argmin`, `argmax`, `count`, `avg` over handles or over `slots(#v1, tomorrow)`.
 - **Comparisons and arithmetic**: `price(#v1) - price(#v7)`, `price(#v1) < price(#v7)` (a boolean renders as a phrase).
 - **Phrases**: derived facts rendered as whole localized phrases, e.g. `stockText(#v1, M)` → "w magazynie 3 szt." /
@@ -223,7 +223,7 @@ okay-facts detects what a model can do and uses the strongest mode:
 - **L3** — + structured outputs / JSON Schema. `{params, template}` by schema: the answer has no place for a value.
 - **L4** — + grammar / logits (local models: okay-mlx, llama.cpp). Constrained generation: digits and declared
   entities impossible outside placeholders — a violation is technically impossible.
-- **L5** — own weights. An okay-circuits module inside the model (research, not in scope here): by construction.
+- **L5** — own weights. An okay-inlay module inside the model (research, not in scope here): by construction.
 
 Strict mode requires L3 or L4; L0–L2 run with policy `regenerate`/`block`.
 

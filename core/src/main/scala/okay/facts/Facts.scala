@@ -138,10 +138,11 @@ object Table:
           (if a(i - 1) == b(j - 1) then 0 else 1))
       d(a.length)(b.length)
 
-  /** the visible properties' texts in the language: what the model may read */
+  /** the visible properties' texts in the language: what the model may read — never one with a digit (an owner's
+   * description saying "3 seats" is a fact: the model does not receive it) */
   def visible(schema: Schema, r: Row, l: Lang): Vector[(String, String)] =
     schema.props(r.ent.cls).filter(_.visible).flatMap(p => r.values.get(p.name).flatMap(v => shown(v, l))
-      .map(p.name -> _))
+      .filterNot(_.exists(_.isDigit)).map(p.name -> _))
 
   private def shown(v: Value, l: Lang): Option[String] = v match
     case Value.Text(t) => Some(Value.in(t, l)).filter(_.nonEmpty)

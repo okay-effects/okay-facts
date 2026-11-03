@@ -3,7 +3,7 @@ package okay.facts.cloud
 import okay.effects.json.Json
 import okay.facts.*
 import okay.facts.tck.Demo
-import okay.llm.{Ask, Llm}
+import okay.llm.Llm
 import okay.scala3.*
 import okay.scala3.std.Clock
 import okay.serverless.cloud.Ai
@@ -70,6 +70,4 @@ class WorkersAiSuite extends munit.FunSuite:
       "usage" -> Json.obj("input_tokens" -> Json.num(5), "output_tokens" -> Json.num(7)))
     val (r, in, outT) = WorkersAi.reply(responses)
     assertEquals((r.reasoning, r.content, in, outT), ("hm", "{\"params\":{},\"template\":\"Hej\"}", 5, 7))
-    val a = Ask(Vector(Json.obj("role" -> Json.str("system"), "content" -> Json.str("rules")),
-      Json.obj("role" -> Json.str("user"), "content" -> Json.str("hi"))))
-    assertEquals(WorkersAi.input("@cf/openai/gpt-oss-120b", a)("instructions"), Json.str("rules"))
+
