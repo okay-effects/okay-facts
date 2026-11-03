@@ -24,7 +24,8 @@ object Spell:
   /** the words of a text, folded */
   def words(text: String): Vector[String] = Words.split(text).map(fold).filter(_.nonEmpty)
 
-  /** whether a word of the text is the name's word (4 letters or more: by prefix, stem or one edit; of 3: its first two and an ending) */
+  /** whether a word of the text is the name's word (4 letters or more: by prefix, stem or one edit; of 3: its first
+   * two and an ending) */
   def near(word: String, name: String): Boolean =
     val (w, n) = (fold(word), fold(name))
     if w.length < 3 then w == n
