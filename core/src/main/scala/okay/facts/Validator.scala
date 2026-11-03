@@ -41,7 +41,32 @@ object Validator:
         val types = typed.collect { case (n, Right(t)) => n -> t }.toMap
         val unitAfter = Icu.after(parts).collect { case (n, rest) if types.get(n).exists(counted) &&
           unitFirst(rest) => Violation("unit", s"a unit after {$n}: '${rest.trim.take(20)}' — the value has its own") }
-        digits ++ names ++ unitAfter ++ worded.take(1) ++ missing ++ unused ++ typed.collect { case (_, Left(v)) => v }
+        // a person's name takes its case (§17): asked, and — in a case — chosen by its own select
+        val cased = a.params.flatMap((n, e) => Expr.parse(e).toOption.flatMap(person(_, handles, schema)).map(n -> _))
+          .flatMap { (n, hint) => Case.parse(hint) match
+            case None => Vector(Violation("case", s"{$n} is a person's name: ask its case (name(…) as gen, as ins, " +
+              "as nom…)"))
+            case Some(c) if c != Case.nom && !Icu.selected(parts, n) => Vector(Violation("case", s"{$n} as $c: " +
+              s"inside {$n, select, sure {…} other {…}} — other when its form is not known"))
+            case _ => Vector.empty
+          }
+        digits ++ names ++ unitAfter ++ worded.take(1) ++ missing ++ unused ++ cased ++
+          typed.collect { case (_, Left(v)) => v }
+
+  /** the case a parameter asks of a person's name ("" none), when it renders one: `name(x)` of a person, or a
+   * person itself (its name) */
+  def person(x: Expr, handles: Handles, schema: Schema): Option[String] =
+    val (inner, hint) = x match
+      case Expr.As(y, h) => (y, h)
+      case y => (y, "")
+    def isPerson(e: Expr) = Expr.typeOf(e, handles, schema, top = false).toOption.exists {
+      case Type.Entity(c) => schema.cls(c).exists(_.person)
+      case _ => false
+    }
+    inner match
+      case Expr.Call("name", Vector(y)) if isPerson(y) => Some(hint)
+      case y if isPerson(y) => Some(hint)
+      case _ => None
 
   private def code(why: String): String =
     if why.startsWith("unknown handle") then "handle"

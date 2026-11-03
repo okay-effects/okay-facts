@@ -7,9 +7,11 @@ final case class Prop(name: String, tpe: Type, visible: Boolean = false, functio
                       about: String = "")
 
 /** A CLASS of the metamodel (specs/design.md §4): its name, its parents, its properties, the prefix of its handles
- * (`v` → `#v1`), its key (identity), the vocabulary term it comes from (`https://schema.org/Service`) */
+ * (`v` → `#v1`), its key (identity), the vocabulary term it comes from (`https://schema.org/Service`), whether its
+ * entities are people (their names take a case: §17) */
 final case class Cls(name: String, prefix: String, props: Vector[Prop], parents: Set[String] = Set.empty,
-                     key: Vector[String] = Vector.empty, iri: String = "", about: String = "")
+                     key: Vector[String] = Vector.empty, iri: String = "", about: String = "",
+                     person: Boolean = false)
 
 /** THE METAMODEL a deployment binds by: classes, their hierarchy, their properties. An ontology's importer makes one;
  * an overlay adds the keys and the cardinalities a vocabulary leaves out */

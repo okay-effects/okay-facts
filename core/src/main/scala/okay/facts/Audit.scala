@@ -9,6 +9,8 @@ enum Audited:
   /** an answer given: its level, its violations seen, the regenerations asked, whether flagged or blocked */
   case Answered(level: Level, violations: Vector[String], regenerations: Int, flagged: Boolean, blocked: Boolean,
                 tokens: Int, at: Long)
+  /** an answer of the router lane (§17): its intent, how sure the router was, the violations seen (none, normally) */
+  case Routed(intent: String, confidence: Double, violations: Vector[String], at: Long)
 
 /** THE AUDIT, an effect: its sink a handler — nowhere, a list (tests), the shop's object and the operator's dashboard
  * (okay-mall) */

@@ -135,6 +135,18 @@ object Icu:
     case Part.Lit(_) => Vector.empty
   }.distinct
 
+  /** whether every use of `name` lies inside a select on it that has an `other` case (a name in a case, §17) */
+  def selected(parts: Vector[Part], name: String): Boolean =
+    def walk(ps: Vector[Part], inside: Boolean): Boolean = ps.forall {
+      case Part.Arg(n, _) => n != name || inside
+      case Part.Hash(n, _) => n != name || inside
+      case Part.Select(n, cs) if n == name => cs.exists(_._1 == "other") && cs.forall(c => walk(c._2, true))
+      case Part.Select(_, cs) => cs.forall(c => walk(c._2, inside))
+      case Part.Plural(_, _, cs) => cs.forall(c => walk(c._2, inside))
+      case Part.Lit(_) => true
+    }
+    walk(parts, false)
+
   /** the message's own text outside every select and plural: where a claim in words has no boolean behind it */
   def topTexts(parts: Vector[Part]): Vector[String] = parts.collect { case Part.Lit(t) => t }
 

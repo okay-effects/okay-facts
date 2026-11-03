@@ -35,7 +35,8 @@ object Demo:
     Cls("Master", "m", Vector(
       Prop("name", Type.Text), Prop("shop", Type.Entity("Shop")),
       Prop("services", Type.Entity("Service"), functional = false)),
-      key = Vector("shop", "id"), iri = "https://schema.org/Person", about = "a person doing the services"),
+      key = Vector("shop", "id"), iri = "https://schema.org/Person", about = "a person doing the services",
+      person = true),
     Cls("Slot", "s", Vector(
       Prop("name", Type.Text, visible = true), Prop("time", Type.Time, about = "when it starts"),
       Prop("date", Type.Date, about = "its day"), Prop("price", Type.Money, about = "its service's price"),

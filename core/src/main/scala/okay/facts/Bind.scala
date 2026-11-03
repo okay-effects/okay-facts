@@ -104,6 +104,13 @@ object Bind:
     case other => other.toString
 
   def system(s: Setup, l: Lang, today: String, handles: Handles, focus: String): String =
+    val people = s.schema.classes.filter(_.person).map(_.name)
+    val names = if people.isEmpty then "" else
+      s"""A PERSON'S NAME (${people.mkString(", ")}) takes its case: bind it with one — name(master(#s1)) as gen
+         |(after u, od, dla, do, у, від, для), as ins (after z, з, с), as dat, as acc, as loc, as nom (a subject, or
+         |"Master: …") — and put a case other than nom in its own select, whose other case needs no case:
+         |{m, select, sure {u {m}} other {(mistrz: {m})}} with m = name(master(#s1)) as gen.
+         |""".stripMargin
     val classes = s.schema.classes.map { c =>
       val parent = if c.parents.isEmpty then "" else s" (a ${c.parents.mkString(", ")})"
       val props = s.schema.props(c.name).map(p => s"${p.name}: ${typeWord(p.tpe)}${
@@ -149,7 +156,7 @@ object Bind:
        |"earlier", "longer", "fits the budget" in your own words — bind the expression and let a select choose
        |the words:
        |{c, select, true {cheaper here} other {not cheaper here}} with c = price(#v2) < price(#v1).
-       |
+       |$names       |
        |$finding
        |$answering
        |FIND FIRST what the user asks about, then answer with the handles found only — never a handle you were not
@@ -299,7 +306,7 @@ object Bind:
     }.mkString)
 
   /** a focus moved to a shop: its handle issued, the model told (a mid-conversation system message) */
-  private def focused[R[_]](s: Setup, c: Conversation, focus: String, l: Lang)(using In[Facts, R])
+  def focused[R[_]](s: Setup, c: Conversation, focus: String, l: Lang)(using In[Facts, R])
     : (Handles, Option[String]) ! R =
     if focus == c.focus then pure((c.handles, None))
     else if !focus.startsWith("shop:") then pure((c.handles, Some("The user is now on the mall's home: find looks " +
@@ -398,6 +405,33 @@ object Bind:
             case Some(Json.Str(h)) => pure((Left(s"unknown handle $h"), None, identity))
             case _ => pure((Left(s"$name takes $arg: a handle"), None, identity))
         case other => pure((Left(s"no tool '$other'"), None, identity))
+
+  // ---- the router's answer (§17)
+
+  /**
+   * THE ROUTER LANE'S ANSWER into the same conversation: an authored `{params, template}` over the handles it found
+   * (`handles`, the table after its finds; `note`, `focused`'s message), validated and rendered by `Resolve` — the
+   * violations when not (a bug of the authored data: the host asks the model lane instead) —, the history kept as the
+   * model lane keeps it (the user's words, what was found, the answer's own `{params, template}`), audited
+   */
+  def authored[R[_]](s: Setup, c: Conversation, user: String, l: Lang, focus: String, handles: Handles,
+                     note: Option[String], answer: Answer, cards: Vector[Card], intent: String, confidence: Double)(
+    using In[Facts, R], In[Clock, R], In[Audit, R]): Either[Vector[Violation], (Conversation, Reply)] ! R =
+    Resolve[R](answer, handles, s.schema, l).flatMap {
+      case Left(vs) => Clock.now[R].flatMap(at => Audit.record[R](Audited.Routed(intent, confidence, vs.map(_.code),
+        at))).as(Left(vs))
+      case Right(r) =>
+        val found = handles.all.filterNot(h => c.handles.get(h.name).isDefined)
+        val kept = (c.history ++ note.toVector.map(msg("system", _)) :+ msg("user", user)) ++
+          (if found.isEmpty then Vector.empty else Vector(msg("system", "Found: " + found.map(h =>
+            s"${h.name} ${h.ent.cls}${h.visible.map((k, v) => s" $k=\"$v\"").mkString}").mkString("; ")))) :+
+          msg("assistant", if s.level.tools then Json.print(Answer.toJson(answer)) else markers(answer))
+        val reply = Reply(Some(r), cards = cards)
+        Clock.now[R].flatMap(at => Audit.record[R](Audited.Routed(intent, confidence, Vector.empty, at)).flatMap(_ =>
+          r.chips.foldLeft(pure[Unit, R](()))((acc, ch) => acc.flatMap(_ => ch.sources.foldLeft(pure[Unit, R](()))(
+            (a2, f) => a2.flatMap(_ => Audit.record[R](Audited.Read(f, ch.param, at))))))))
+          .as(Right(Conversation(handles, trim(kept, s.keep), focus) -> reply))
+    }
 
   // ---- the answer
 

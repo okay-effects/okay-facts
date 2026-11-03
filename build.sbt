@@ -41,7 +41,13 @@ lazy val cloud = crossProject(JVMPlatform, JSPlatform).crossType(CrossType.Pure)
   .settings(name := "okay-facts-cloud",
     libraryDependencies ++= Seq("io.github.okay-effects" %%% "okay-serverless" % "0.1.0", munit.value))
 
-lazy val root = (project in file(".")).aggregate(core.jvm, core.js, cloud.jvm, cloud.js).settings(publish / skip := true)
+/** THE ROUTER LANE (specs/design.md §17): rules in a portable dialect (each platform's own regexes), the static
+ * embedding table read in place, the probe, language, the generic slots — no generative model */
+lazy val router = crossProject(JVMPlatform, JSPlatform).crossType(CrossType.Full).in(file("router")).dependsOn(core)
+  .settings(name := "okay-facts-router", libraryDependencies += munit.value)
+
+lazy val root = (project in file(".")).aggregate(core.jvm, core.js, cloud.jvm, cloud.js, router.jvm, router.js)
+  .settings(publish / skip := true)
 
 /** THE TCK'S RUNNER (specs/design.md §11, never published): the suite against Workers AI models — through the
  * passthrough Worker below, run by `wrangler dev` (the account's Workers AI) — the passports printed and written */

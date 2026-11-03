@@ -1,0 +1,135 @@
+package okay.facts.router
+
+import okay.facts.{Lang, Zone}
+
+/** THE ROUTER LANE'S PIECES (specs/design.md §17) on both platforms: rules alike in a Worker and on the JVM, the
+ * table read in place, the probe, language, days and times, price limits, the nearest candidates */
+class RouterSuite extends munit.FunSuite:
+  test("rules: a word of Latin or Cyrillic letters, Polish and Ukrainian ones too; boundaries; case-insensitive"):
+    val r = Rules.compile("\\b(?:cześć|привіт|п'ятниц\\w*|hello)\\b")
+    assert(r.test("Cześć!") && r.test("ну ПРИВІТ") && r.test("у п'ятницю") && r.test("hello there"))
+    assert(!r.test("czeszcz") && !r.test("привітання") && !r.test("othello"))
+    assertEquals(Rules.compile("(\\d+)\\s*zł").group("do 150 zł"), Some("150"))
+    intercept[IllegalArgumentException](Rules.compile("\\p{L}"))
+    assertEquals(Rules.compile("o (\\d+)").all("o 10 i o 12").map(_._3), Vector(Vector("10"), Vector("12")))
+
+  /** a toy table: four directions, units by meaning */
+  val toy: Table =
+    def v(xs: Double*) = xs.map(_.toFloat).toArray
+    val rows = Vector("ile" -> v(1, 0, 0, 0), "kosztuje" -> v(1, 0.1, 0, 0), "cena" -> v(0.9, 0.2, 0, 0),
+      "price" -> v(1, 0, 0.1, 0), "jutro" -> v(0, 1, 0, 0), "wolne" -> v(0, 0.9, 0.1, 0), "free" -> v(0, 1, 0, 0.1),
+      "strzyżenie" -> v(0, 0, 1, 0), "haircut" -> v(0, 0.05, 1, 0), "стрижка" -> v(0, 0, 0.95, 0.1),
+      "broda" -> v(0, 0, 0, 1), "beard" -> v(0, 0, 0.1, 1), "cześć" -> v(0.5, 0.5, 0.5, 0.5))
+    Table(Table.write(rows.map(_._1), rows.map((_, x) => Table.normalised(x)), rows.map(_ => 1.0), Map("enc" -> "toy")))
+
+  test("the table: written and read back in place, half precision; a text's vector; coverage"):
+    assertEquals((toy.size, toy.dim, toy.meta.get("enc")), (13, 4, Some("toy")))
+    val v = toy.vector("haircut").get
+    assert(math.abs(Table.dot(v, toy.vector("strzyżenie").get) - 0.9988) < 0.01)
+    assert(toy.encode("zzz qqq").isEmpty)
+    assertEquals(toy.coverage("ile kosztuje xyz"), 2.0 / 3)
+    assertEquals(Table.units3("Ile kosztuje strzyżenie?"), Vector("ile", "kosztuje", "strzyżenie", "ile kosztuje",
+      "kosztuje strzyżenie", "ile kosztuje strzyżenie"))
+    for x <- Seq(0.0f, 1.0f, -0.5f, 0.333f, 1e-5f) do assert(math.abs(Table.half(Table.toHalf(x)) - x) < 1e-3, x)
+
+  val intents: Vector[Intent] = Intents.parse("""{"intents": [
+    {"name": "greet", "rank": 10, "rules": ["\\b(?:cześć|hello)\\b"]},
+    {"name": "price", "examples": {"pl": ["ile kosztuje", "cena"], "en": ["price"]}},
+    {"name": "slots", "examples": {"pl": ["jutro wolne"], "en": ["free tomorrow"]}}]}""")
+
+  test("the router: rules first, then the probe fitted on the examples; unknown words go nowhere"):
+    val router = Router(intents, Router.fit(toy, intents))
+    assertEquals(router.route(toy, "Cześć, ile kosztuje?").by, "rule")
+    assertEquals(router.route(toy, "Cześć, ile kosztuje?").intent, "greet")
+    val price = router.route(toy, "ile kosztuje strzyżenie")
+    assertEquals((price.intent, price.by), ("price", "probe"))
+    assert(price.confident(0.6, 0.2), price)
+    assertEquals(router.route(toy, "jutro wolne?").intent, "slots")
+    assertEquals(router.route(toy, "qwerty").by, "unknown")
+    assert(!Route("price", "probe", 0.5, 0.1).confident(0.6, 0.2))
+    // the probe's weights as data, read back alike
+    val again = Probe.fromJson(okay.effects.json.Json.fromText(okay.effects.json.Json.print(Probe.toJson(
+      router.probe))))
+    assertEquals(again.ranked(toy.encode("cena").get).head._1, "price")
+
+  test("language: the script, its own letters and words; an amount is no language's; the last one otherwise"):
+    assertEquals(Detect.of("Ile kosztuje strzyżenie?"), Some(Lang.pl))
+    assertEquals(Detect.of("Скільки коштує стрижка?"), Some(Lang.uk))
+    assertEquals(Detect.of("Сколько стоит стрижка?"), Some(Lang.ru))
+    assertEquals(Detect.of("How much is a haircut?"), Some(Lang.en))
+    assertEquals(Detect.of("manicure 150 zł"), None)
+    assertEquals(Detect.answer("manicure 150 zł", Some(Lang.pl)), Lang.pl)
+    assertEquals(Detect.answer("ok", Some(Lang.uk)), Lang.pl)
+    assertEquals(Detect.answer("ok", Some(Lang.uk), Lang.ru), Lang.en)
+    assertEquals(Detect.answer("ок", Some(Lang.uk)), Lang.uk)
+
+  // Tuesday, 2026-11-03
+  val today = "2026-11-03"
+
+  test("days in four languages, relative to today"):
+    def day(t: String) = When.of(t, today).day
+    for t <- Seq("jutro", "Tomorrow?", "завтра вечером", "Завтра зранку") do assertEquals(day(t), Some("2026-11-04"), t)
+    for t <- Seq("pojutrze", "післязавтра", "послезавтра", "the day after tomorrow") do
+      assertEquals(day(t), Some("2026-11-05"), t)
+    for t <- Seq("dziś", "dzisiaj", "today", "сьогодні", "сегодня") do assertEquals(day(t), Some(today), t)
+    for t <- Seq("w piątek", "w piatek", "у п'ятницю", "у пʼятницю", "в пятницу", "on Friday") do
+      assertEquals(day(t), Some("2026-11-06"), t)
+    assertEquals(day("we wtorek"), Some(today))
+    assertEquals(day("w poniedziałek"), Some("2026-11-09"))
+    assertEquals(day("5.11"), Some("2026-11-05"))
+    assertEquals(day("12 listopada"), Some("2026-11-12"))
+    assertEquals(day("12 листопада"), Some("2026-11-12"))
+    assertEquals(day("12 ноября"), Some("2026-11-12"))
+    assertEquals(day("November 12"), Some("2026-11-12"))
+    assertEquals(day("2 stycznia"), Some("2027-01-02"))
+    assertEquals(day("ile kosztuje"), None)
+
+  test("times: exact, from, until; parts of the day; a price is never a time"):
+    def w(t: String) = When.of(t, today)
+    assertEquals(w("jutro o 17").at, Some(17 * 60))
+    assertEquals(w("na 10:30").at, Some(10 * 60 + 30))
+    assertEquals(w("о 10").at, Some(10 * 60))
+    assertEquals(w("в 10 утра").at, Some(10 * 60))
+    assertEquals(w("at 5pm").at, Some(17 * 60))
+    assertEquals(w("17:30?").at, Some(17 * 60 + 30))
+    assertEquals(w("po 17").from, Some(17 * 60))
+    assertEquals(w("після 5").from, Some(17 * 60))
+    assertEquals(w("after 4pm").from, Some(16 * 60))
+    assertEquals(w("przed 12").until, Some(12 * 60))
+    assertEquals(w("до 12").until, Some(12 * 60))
+    assertEquals(w("rano").until, Some(12 * 60))
+    assertEquals(w("wieczorem").from, Some(17 * 60))
+    assertEquals(w("ввечері").part, Some("evening"))
+    assertEquals(w("po południu").from, Some(12 * 60))
+    assertEquals(w("do 150 zł").until, None)
+    assertEquals(w("na 2 osoby").at, None)
+    assertEquals(w("za 45 minut").at, None)
+    assertEquals(w("do 150").until, None)
+
+  test("price limits in four languages; a small number without a currency is a time's"):
+    def max(t: String) = Amount.of(t).max
+    assertEquals(max("manicure do 150 zł"), Some(15000L))
+    assertEquals(max("poniżej 150"), Some(15000L))
+    assertEquals(max("taniej niż 99,50"), Some(9950L))
+    assertEquals(max("150 zł max"), Some(15000L))
+    assertEquals(max("до 150"), Some(15000L))
+    assertEquals(max("дешевше 200 злотих"), Some(20000L))
+    assertEquals(max("дешевле 120"), Some(12000L))
+    assertEquals(max("under 150"), Some(15000L))
+    assertEquals(max("up to 80 pln"), Some(8000L))
+    assertEquals(max("do 12"), None)
+    assertEquals(max("do 20 zł"), Some(2000L))
+    assertEquals(Amount.of("od 100 zł").min, Some(10000L))
+    assertEquals(Amount.of("jutro o 17").isEmpty, true)
+
+  test("the nearest candidates: one, several too close to tell, none"):
+    val cs = Vector(Nearest.Candidate("cut", Vector("Strzyżenie", "Haircut")),
+      Nearest.Candidate("beard", Vector("Broda", "Beard")),
+      Nearest.Candidate("combo", Vector("Strzyżenie + broda", "Haircut + beard")))
+    val one = Nearest.rank(toy, "ile kosztuje strzyżenie", cs)
+    assertEquals(one.head._1, "cut")
+    assertEquals(Nearest.pick(one, 0.5, 0.1), Nearest.Pick.One("cut", one.head._2))
+    assertEquals(Nearest.rank(toy, "стрижка", cs).head._1, "cut")
+    assertEquals(Nearest.pick(Nearest.rank(toy, "qwerty", cs), 0.5, 0.1), Nearest.Pick.Nothing)
+    assertEquals(Nearest.pick(Vector("a" -> 0.8, "b" -> 0.78, "c" -> 0.3), 0.5, 0.1),
+      Nearest.Pick.Several(Vector("a", "b")))

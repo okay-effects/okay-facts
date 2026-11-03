@@ -24,8 +24,8 @@ class BindSuite extends munit.FunSuite:
   val findSlots: String = Model.call("find", """{"class": "Slot", "where": ["service = #v1", "date = tomorrow",
     "time >= 17:00"]}""".replace("\n", " "))
   val answer: String = """{"params": {"s": "name(#v1)", "p": "price(#v1)", "d": "duration(#v1)", "t1": "time(#s1)",
-    "m1": "name(master(#s1))", "t2": "time(#s2)"}, "template": "Tak, {s} kosztuje {p} i trwa {d}. Jutro wolne: {t1}
-    ({m1}) albo {t2}. Zapisać?"}""".replace("\n    ", " ").replace("\n", " ")
+    "m1": "name(master(#s1)) as nom", "t2": "time(#s2)"}, "template": "Tak, {s} kosztuje {p} i trwa {d}.
+    Jutro wolne: {t1} ({m1}) albo {t2}. Zapisać?"}""".replace("\n    ", " ").replace("\n", " ")
   val expected = "Tak, Strzyżenie + broda kosztuje 90,00 zł i trwa 45 minut. Jutro wolne: 17:30 (Marek) albo 18:15. " +
     "Zapisać?"
 
@@ -41,7 +41,7 @@ class BindSuite extends munit.FunSuite:
 
   test("§12's dialogue at L0: command lines, markers — the same text as the L3 JSON path"):
     val markers = "Tak, ⟦name(#v1)⟧ kosztuje ⟦price(#v1)⟧ i trwa ⟦duration(#v1)⟧. Jutro wolne: ⟦time(#s1)⟧ " +
-      "(⟦name(master(#s1))⟧) albo ⟦time(#s2)⟧. Zapisać?"
+      "(⟦name(master(#s1)) as nom⟧) albo ⟦time(#s2)⟧. Zapisać?"
     val (_, (_, r)) = turn(l0, Vector("⟦find Service text=\"strzyżenie broda\"⟧",
       "⟦find Slot where=\"service = #v1; date = tomorrow; time >= 17:00\"⟧", markers), "Ile kosztuje…?")
     assertEquals(r.rendered.map(_.text), Some(expected))

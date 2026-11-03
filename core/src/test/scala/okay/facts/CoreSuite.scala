@@ -186,7 +186,7 @@ class ValidatorSuite extends Ground:
 class ResolveSuite extends Ground:
   /** specs/design.md §12: the model's raw output has no fact; the user reads every value from the data */
   val example: Answer = Answer(Vector("s" -> "name(#v1)", "p" -> "price(#v1)", "d" -> "duration(#v1)",
-    "t1" -> "time(#s1)", "m1" -> "name(master(#s1))", "t2" -> "time(#s2)"),
+    "t1" -> "time(#s1)", "m1" -> "name(master(#s1)) as nom", "t2" -> "time(#s2)"),
     "Tak, {s} kosztuje {p} i trwa {d}. Jutro wolne: {t1} ({m1}) albo {t2}. Zapisać?")
 
   test("the dialogue example of §12 renders from the data, every value a chip with its entity and source"):

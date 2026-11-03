@@ -4,9 +4,10 @@ import okay.effects.json.Json
 import okay.scala3.*
 
 /** A RENDERED PARAMETER, a chip: its text, its type, the entity it belongs to (its handle and name), where it came
- * from (source, key, property, version, when it changed) — and, for a slot or a shop, what a click does */
+ * from (source, key, property, version, when it changed) — and, for a slot or a shop, what a click does; a name asked
+ * in a case: the case, and whether its form was known (`sure`; not: the nominative) */
 final case class Chip(param: String, text: String, tpe: String, handle: Option[String], entity: String,
-                      sources: Vector[Fact], link: Option[String] = None)
+                      sources: Vector[Fact], link: Option[String] = None, kase: String = "", sure: Boolean = true)
 
 /** A RENDERED ANSWER: the text the user reads, in pieces (template text or a chip), and the model's raw answer */
 final case class Rendered(segments: Vector[Icu.Seg], chips: Vector[Chip], raw: Answer):
@@ -27,7 +28,9 @@ object Rendered:
       "sources" -> Json.Arr(c.sources.map(f => Json.obj("source" -> Json.str(f.ent.source),
         "key" -> Json.str(f.ent.key), "class" -> Json.str(f.ent.cls), "property" -> Json.str(f.prop),
         "version" -> Json.num(f.version), "updatedAt" -> Json.num(f.updatedAt))))) ++
-      c.handle.map(h => "handle" -> Json.str(h)) ++ c.link.map(l => "link" -> Json.str(l))))),
+      c.handle.map(h => "handle" -> Json.str(h)) ++ c.link.map(l => "link" -> Json.str(l)) ++
+      Option.when(c.kase.nonEmpty)("case" -> Json.str(c.kase)) ++ Option.when(c.kase.nonEmpty)("sure" ->
+      Json.bool(c.sure))))),
     "raw" -> Answer.toJson(r.raw))
 
 /**
@@ -65,11 +68,12 @@ object Resolve:
   def format(a: Answer, byName: Map[String, (Computed, Chip)], l: Lang): Option[Rendered] =
     Icu.parse(a.template).toOption.filter(parts => Icu.names(parts).forall(byName.contains)).map { parts =>
       val segs = Icu.format(parts, l, n => byName(n)._2.text, n => Render.plural(byName(n)._1.value),
-        n => byName(n)._1.value match
-          case Value.Bool(b) => b.toString
-          case Value.Text(t) => Value.in(t, l)
-          case Value.Num(x) => x.toString
-          case _ => "other")
+        n => if byName(n)._2.kase.nonEmpty then (if byName(n)._2.sure then "sure" else "other")
+          else byName(n)._1.value match
+            case Value.Bool(b) => b.toString
+            case Value.Text(t) => Value.in(t, l)
+            case Value.Num(x) => x.toString
+            case _ => "other")
       Rendered(segs, a.params.flatMap((n, _) => byName.get(n).map(_._2)), a)
     }
 
@@ -98,7 +102,7 @@ object Resolve:
       case _ => Vector.empty).distinct
     Eval.each(entities)(e => nameOf(e).map(s => Right(e -> s))).flatMap { named =>
       val names = named.toOption.getOrElse(Vector.empty).toMap
-      val text = Render(c.value, l, hint(x), e => names.getOrElse(e, e.key))
+      val plain = Render(c.value, l, hint(x), e => names.getOrElse(e, e.key))
       val link = about.flatMap(h => if h.ent.cls == "Slot" && Expr.show(x).startsWith("time(") then
         Some("book:" + h.name) else None).orElse(c.value match
         case Value.Url(u) => Some(u)
@@ -108,6 +112,19 @@ object Resolve:
         case Some(h) => nameOf(h.ent)
         case None => Eval.each(Expr.handles(x).distinct.flatMap(handles.get))(h => nameOf(h.ent).map(n =>
           Right[String, String](n))).map(_.toOption.getOrElse(Vector.empty).distinct.mkString(", "))
-      entityName.map(entity =>
-        Chip(n, text, Value.typeOf(c.value).show, about.map(_.name), entity, c.facts, link))
+      val kase = Case.parse(hint(x))
+      val whose = c.value match
+        case Value.Entity(e) => Some(e)
+        case Value.Text(_) => c.facts.lastOption.filter(_.prop == "name").map(_.ent)
+        case _ => None
+      // a name in a case: the owner's form (`name.<case>`) first, else the rules; neither: the nominative, not sure
+      val inCase: Option[String] ! R = (kase, whose) match
+        case (Some(k), Some(e)) => Facts.get[R](e, s"name.$k").map(_.flatMap(f => f.value match
+            case Value.Text(t) => t.get(l).map(_.trim).filter(_.nonEmpty)
+            case _ => None).orElse(Morph.inflect(plain, l, k)))
+        case (Some(k), None) => pure(Morph.inflect(plain, l, k))
+        case _ => pure(Some(plain))
+      inCase.flatMap(form => entityName.map(entity =>
+        Chip(n, form.getOrElse(plain), Value.typeOf(c.value).show, about.map(_.name), entity, c.facts, link,
+          kase.fold("")(_.toString), form.isDefined)))
     }
