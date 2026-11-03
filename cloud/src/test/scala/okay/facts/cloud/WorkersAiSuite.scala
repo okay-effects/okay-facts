@@ -71,3 +71,13 @@ class WorkersAiSuite extends munit.FunSuite:
     val (r, in, outT) = WorkersAi.reply(responses)
     assertEquals((r.reasoning, r.content, in, outT), ("hm", "{\"params\":{},\"template\":\"Hej\"}", 5, 7))
 
+
+  test("the model's per-minute limit: asked again after a pause, then answered"):
+    val s = Setup(Demo.schema, "A fictional barber's assistant.", Level.L3)
+    val program = Emit.none(Audit.ignore(Bind.turn[B](s, Conversation(), "Hej", Lang.pl, "mall")))
+    val out = Vector(Left("AiError: 3021: rate limiting: inference request per min rate reached"),
+      Right(Json.obj("response" -> Json.obj("params" -> Json.obj(), "template" -> Json.str("Cześć!")))))
+    val (waited, (_, r)) = run(Demo.facts(None)(Clock.virtual(Demo.now)(answers(out,
+      scala.collection.mutable.Buffer.empty)(WorkersAi.llm("m")(program)))))
+    assertEquals(r.rendered.map(_.text), Some("Cześć!"))
+    assertEquals(waited - Demo.now, 2000L)

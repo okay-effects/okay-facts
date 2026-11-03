@@ -58,7 +58,15 @@ object WorkersAi:
     (r, tokensIn, tokensOut)
 
   /** `Llm` by the binding: each generation one `Ai` call of `model` (or the one an ask names) */
-  def llm[R[_], Rest[_], A](model: String)(p: A ! R)(using Split[Llm, R, Rest], In[Ai, Rest]): A ! Rest =
+  def llm[R[_], Rest[_], A](model: String)(p: A ! R)(using Split[Llm, R, Rest], In[Ai, Rest],
+    In[okay.scala3.std.Clock, Rest]): A ! Rest =
+    // the per-minute limit of a model (3021): asked again twice, 2 and 5 seconds later
+    def attempt(m: String, in: Json, waits: List[Long]): Either[String, Json] ! Rest =
+      Ai.attempt[Rest](m, in).flatMap {
+        case Left(why) if why.contains("3021") && waits.nonEmpty =>
+          okay.scala3.std.Clock.sleep[Rest](waits.head).flatMap(_ => attempt(m, in, waits.tail))
+        case other => pure(other)
+      }
     val running = scala.collection.mutable.HashMap.empty[Long, (Finished, Boolean)]
     var ids = 0L
     handle(p, Handler.general[Llm, Rest, A, A](pure)([X] => (op: Llm[X], k: X => A ! Rest) => op match
@@ -67,7 +75,7 @@ object WorkersAi:
       case Llm.Count(a) => k(a.messages.map(_.render.length).sum / 4)
       case Llm.Start(a) =>
         val m = a.model.getOrElse(model)
-        Ai.attempt[Rest](m, input(m, a)).flatMap { res =>
+        attempt(m, input(m, a), List(2000L, 5000L)).flatMap { res =>
           ids += 1
           val f = res match
             case Left(why) => Finished(Reply(s"error: $why", "", Vector.empty), Timing(0, 0, 0, 0), byStop = false)
