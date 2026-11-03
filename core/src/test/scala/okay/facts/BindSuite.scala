@@ -146,7 +146,8 @@ class BindSuite extends munit.FunSuite:
         case Left(e) => pure(Vector(s"error: $e"))
         case Right(q) => Facts.find[Facts](q).map(_.map(_.ent.key))
       }))
-    assertEquals(keys("""{"class": "Manicure", "where": ["shop.city = Kraków"], "scope": "mall"}"""), Vector("japanese"))
+    assertEquals(keys("""{"class": "Manicure", "where": ["shop.city = Kraków"], "scope": "mall"}"""),
+      Vector("japanese"))
     assertEquals(keys("""{"class": "Manicure", "where": ["city(shop) = Kraków"], "scope": "mall"}"""),
       Vector("japanese"))
     assert(keys("""{"class": "Slot", "where": ["service = manicure hybrydowy", "date = tomorrow"], "scope": "mall"}""")

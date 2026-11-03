@@ -20,7 +20,8 @@ enum Policy:
  * the policy, the class a focus is (a shop), the limits of a turn */
 final case class Setup(schema: Schema, about: String, level: Level = Level.L3, policy: Policy = Policy.Regenerate,
                        focusClass: String = "Shop", rounds: Int = 4, retries: Int = 2, maxTokens: Int = 600,
-                       temperature: Double = 0.2, keep: Int = 16, stream: Boolean = false, actions: Vector[(String, String, String)] =
+                       temperature: Double = 0.2, keep: Int = 16, stream: Boolean = false,
+                       actions: Vector[(String, String, String)] =
                          Vector("open" -> "shop" -> "the shop's page opened for the user (a link card)",
                            "book" -> "slot" -> "a booking card shown: the user confirms it with their name and contact")
                          .map { case ((a, b), c) => (a, b, c) })
@@ -144,7 +145,10 @@ object Bind:
        |
        |TEMPLATE: an ICU message. {p} for a parameter; never a unit after a money or duration (it renders with its
        |own); {c, select, true {…} other {…}} for a boolean; {n, plural, one {…} few {…} many {…} other {…}} with #.
-       |No digits, no names of things found — always parameters.
+       |No digits, no names of things found — always parameters. A comparison is a fact too: never say "cheaper",
+       |"earlier", "longer", "fits the budget" in your own words — bind the expression and let a select choose
+       |the words:
+       |{c, select, true {cheaper here} other {not cheaper here}} with c = price(#v2) < price(#v1).
        |
        |$finding
        |$answering
@@ -332,8 +336,9 @@ object Bind:
         case None =>
           val commands = if s.level.tools then f.reply.toolCalls else Commands.parse(f.reply.content)
           if commands.isEmpty || i >= s.rounds then pure((spent, f.reply.content))
-          else Eval.each(commands.zipWithIndex)((t, k) => execute[R](s, t, today, l, spent.handles).map(x => Right[String, (ToolCall,
-            Int, Either[String, Json], Option[Card], Handles => Handles)]((t, k, x._1, x._2, x._3)))).flatMap {
+          else Eval.each(commands.zipWithIndex)((t, k) => execute[R](s, t, today, l, spent.handles).map(x =>
+            Right[String, (ToolCall, Int, Either[String, Json], Option[Card], Handles => Handles)](
+              (t, k, x._1, x._2, x._3)))).flatMap {
             case Left(_) => pure((spent, f.reply.content))
             case Right(done) =>
               // the handles issued in order, each result told by the handles it made

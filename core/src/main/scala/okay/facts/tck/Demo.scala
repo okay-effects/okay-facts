@@ -44,7 +44,8 @@ object Demo:
       Prop("available", Type.Bool, about = "whether it is still free")),
       key = Vector("shop", "master", "start"), about = "a free start of a service with a master"),
     Cls("Booking", "b", Vector(
-      Prop("name", Type.Text), Prop("time", Type.Time), Prop("price", Type.Money), Prop("master", Type.Entity("Master")),
+      Prop("name", Type.Text), Prop("time", Type.Time), Prop("price", Type.Money),
+      Prop("master", Type.Entity("Master")),
       Prop("service", Type.Entity("Service")), Prop("shop", Type.Entity("Shop")), Prop("ref", Type.Text)),
       about = "a booking made in the chat: its values pinned as booked"),
     Cls("Review", "r", Vector(

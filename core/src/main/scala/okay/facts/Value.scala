@@ -24,7 +24,8 @@ final case class Noun(pl: Forms, uk: Forms, ru: Forms, en: Forms):
     case Lang.en => en
 
 object Noun:
-  val minute: Noun = Noun(Forms("minuta", "minuty", "minut", "minuty"), Forms("хвилина", "хвилини", "хвилин", "хвилини"),
+  val minute: Noun = Noun(Forms("minuta", "minuty", "minut", "minuty"),
+    Forms("хвилина", "хвилини", "хвилин", "хвилини"),
     Forms("минута", "минуты", "минут", "минуты"), Forms("minute", "minutes", "minutes", "minutes"))
   val hour: Noun = Noun(Forms("godzina", "godziny", "godzin", "godziny"), Forms("година", "години", "годин", "години"),
     Forms("час", "часа", "часов", "часа"), Forms("hour", "hours", "hours", "hours"))

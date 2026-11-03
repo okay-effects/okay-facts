@@ -74,7 +74,8 @@ object Facts:
     : Either[String, Acted] ! R = perform[Facts](Act(name, args, lang))
 
   /** the facts of rows in memory: `Table`'s find and get; no actions */
-  def table[R[_], Rest[_], A](schema: Schema, rows: () => Vector[Row])(p: A ! R)(using Split[Facts, R, Rest]): A ! Rest =
+  def table[R[_], Rest[_], A](schema: Schema, rows: () => Vector[Row])(p: A ! R)(using Split[Facts, R, Rest])
+    : A ! Rest =
     handle(p, Handler.tail[Facts, Rest, A, A](pure)([X] => (op: Facts[X]) => op match
       case Find(q) => Table.find(schema, rows(), q)
       case Get(ent, prop) => Table.get(rows(), ent, prop)

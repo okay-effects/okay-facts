@@ -103,6 +103,11 @@ object Resolve:
         Some("book:" + h.name) else None).orElse(c.value match
         case Value.Url(u) => Some(u)
         case _ => None)
-      about.fold(pure[String, R](""))(h => nameOf(h.ent)).map(entity =>
+      // the entity: the one handle's name; a value computed of several, their names
+      val entityName: String ! R = about match
+        case Some(h) => nameOf(h.ent)
+        case None => Eval.each(Expr.handles(x).distinct.flatMap(handles.get))(h => nameOf(h.ent).map(n =>
+          Right[String, String](n))).map(_.toOption.getOrElse(Vector.empty).distinct.mkString(", "))
+      entityName.map(entity =>
         Chip(n, text, Value.typeOf(c.value).show, about.map(_.name), entity, c.facts, link))
     }

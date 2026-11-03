@@ -18,7 +18,8 @@ trait Ground extends munit.FunSuite:
       r.values("time") == Value.At(Zone.instant(Demo.tomorrow, 17 * 60 + 30))).get
     val slot18 = rows.find(r => r.ent.cls == "Slot" && r.ent.key.startsWith("kuba@")).get
     Vector(row(Demo.service("barber-demo", "combo")), slot17, slot18,
-      row(Demo.service("nails-demo", "hybrid", "Manicure")), row(Demo.shop("barber-demo")), row(Demo.shop("nails-demo")),
+      row(Demo.service("nails-demo", "hybrid", "Manicure")), row(Demo.shop("barber-demo")),
+      row(Demo.shop("nails-demo")),
       row(Demo.master("barber-demo", "marek")))
       .foldLeft(Handles())((h, r) => h.issue(Demo.schema.prefix(r.ent.cls), r.ent, r.version,
         Table.visible(Demo.schema, r, Lang.pl))._1)
@@ -256,3 +257,8 @@ class WireSuite extends Ground:
       val served = facts(Wire.serve[F](okay.effects.json.Json.fromText(Wire.request(op).render)))
       val direct = facts(perform[Facts](op.asInstanceOf[Facts[Any]]))
       assertEquals(Wire.answer(op.asInstanceOf[Facts[Any]], Right(served)), direct)
+
+class ChipSuite extends Ground:
+  test("a value computed of several entities: the chip names them all"):
+    val r = render(Answer(Vector("c" -> "price(#v1) < price(#v2)"), "{c, select, true {Taniej.} other {Drożej.}}"))
+    assertEquals(r.map(_.chips.head.entity), Right("Strzyżenie + broda, Manicure hybrydowy"))
