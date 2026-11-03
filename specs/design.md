@@ -216,14 +216,14 @@ Checks:
 
 okay-facts detects what a model can do and uses the strongest mode:
 
-| Level | The model can | Mode | Guarantee |
-|---|---|---|---|
-| L0 | text only | inline markers; queries by a text protocol (`⟦find …⟧` lines executed, conversation continued); render after | values exact; validator catches violations |
-| L1 | + streaming | the same, rendered live | same, no delay |
-| L2 | + tool calls | native `find`/actions | exact search and filters |
-| L3 | + structured outputs / JSON Schema | `{params, template}` by schema | the answer has no place for a value |
-| L4 | + grammar / logits (local models: okay-mlx, llama.cpp) | constrained generation: digits and declared entities impossible outside placeholders | a violation is technically impossible |
-| L5 | own weights | an okay-circuits module inside the model (research, not in scope here) | by construction |
+- **L0** — text only. Inline markers; queries by a text protocol (`⟦find …⟧` lines executed, the conversation
+  continued); render after the answer. Values exact; the validator catches violations.
+- **L1** — + streaming. The same, rendered live.
+- **L2** — + tool calls. Native `find` and actions: exact search and filters.
+- **L3** — + structured outputs / JSON Schema. `{params, template}` by schema: the answer has no place for a value.
+- **L4** — + grammar / logits (local models: okay-mlx, llama.cpp). Constrained generation: digits and declared
+  entities impossible outside placeholders — a violation is technically impossible.
+- **L5** — own weights. An okay-circuits module inside the model (research, not in scope here): by construction.
 
 Strict mode requires L3 or L4; L0–L2 run with policy `regenerate`/`block`.
 
@@ -234,11 +234,13 @@ then streams rendered. A placeholder split across chunks (`{pri` + `ce}`) is hel
 
 **The rule of connection: the strict guarantee exists only where okay-facts stands between the model and the user.**
 
-| Way | Looks like | Who writes the final answer | Guarantee |
-|---|---|---|---|
-| 1. Library / SDK | your app calls okay-facts, it calls the model | model the template, okay-facts the values | strict |
-| 2. Proxy (Anthropic- and OpenAI-compatible endpoints) | the app changes `base_url` (+ `X-Okay-Facts: <tenant>/<schema>`); okay-facts runs the tool loop inside, returns bound text + `facts[]` | same | strict |
-| 3. MCP server | a foreign agent (Claude Code, Desktop, Cursor…) calls `find`, `get_fact`, `verify_answer` | the foreign model | verification and audit only |
+1. **Library / SDK** — your app calls okay-facts, it calls the model; the model writes the template, okay-facts the
+   values. **Strict.**
+2. **Proxy** (Anthropic- and OpenAI-compatible endpoints) — the app changes `base_url` (and sends
+   `X-Okay-Facts: <tenant>/<schema>`); okay-facts runs the tool loop inside and returns the bound text and `facts[]`.
+   **Strict.**
+3. **MCP server** — a foreign agent (Claude Code, Desktop, Cursor…) calls `find`, `get_fact`, `verify_answer`; the
+   foreign model writes the final answer. **Verification and audit only.**
 
 - The library is one line: `ShopFacts.bind(model = …)(request)`.
 - The MCP mode returns a **verdict** on an answer (each number: green — backed by a bound fact; red — no source or a
@@ -301,13 +303,11 @@ Example flow (one conversation):
 
 ### The shop's facts (from okay-shop's data, ontology: schema.org + overlay)
 
-| Class | Properties (visibility) |
-|---|---|
-| `Shop` (schema.org LocalBusiness) | name (visible), category (visible), city (visible), address (hidden), url (hidden), hours (hidden), rating (hidden) |
-| `Service` (Offer of a Service) | name (visible), price (hidden), duration (hidden), master (link) |
-| `Master` (Person) | name (hidden), services (link) |
-| `Slot` | time (hidden), master (link), service (link) |
-| `Review` | rating (hidden), text (hidden) |
+- `Shop` (schema.org LocalBusiness): name, category, city (visible); address, url, hours, rating (hidden).
+- `Service` (Offer of a Service): name (visible); price, duration (hidden); master (link).
+- `Master` (Person): name (hidden); services (link).
+- `Slot`: time (hidden); master, service (links).
+- `Review`: rating, text (hidden).
 
 Keys: shop id; service id within a shop; slot = (shop, master, start). Slots are computed by the resolver from the
 masters' calendars and working hours (the booking already in okay-shop), never listed to the model.
