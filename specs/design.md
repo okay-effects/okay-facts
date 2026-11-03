@@ -394,6 +394,24 @@ Each stage: spec section first, tests, then code; done-when is the gate.
 
 ## 16. Open questions (decide while implementing, record here)
 
+### Operator decisions (2026-11-03)
+
+- **Public**: okay-facts is PUBLIC — okay-effects/okay-facts on GitHub, Apache-2.0 like okay-shop; released as a Maven
+  repository on GitHub Pages (RELEASING.md), republished under 0.1.0 while unused by others (the tag moved, the
+  dependents' Coursier cache cleared, Pages checked by sha1 before they rebuild).
+- **Production: all shops**: once stage 5 passes on `MemoryCloud` and on `wrangler dev` with the demo tenants, every
+  shop of the mall gets the chat — the real atelier (`atelier`) too — and the landing (apex). it.szykownia.pl is not
+  the mall's: untouched. Each shop has an off switch in the admin (default on).
+- **Retention: 30 days** for a conversation and the client's data said in it: `ChatObject` deletes its storage after
+  30 days without activity (its alarm); "delete this conversation" in the widget deletes it at once. The chat is in
+  the platform's privacy policy (`/_z/privacy`: purpose, data, 30 days, the processor Cloudflare / Workers AI,
+  rights) and, minimally, in each shop's privacy page (okay-shop's `Privacy`): the atelier's privacy page changes,
+  as intended.
+- **Model: Workers AI only** (okay-serverless' `Ai`, the `AI` binding). Stage 3 runs the TCK on the current Workers AI
+  candidates with tool calling; the default is chosen by the passport. Strict mode on production needs L3 (tool
+  calls + JSON schema); with no model reaching L3 reliably, the best one with policy `regenerate` — said so here.
+
+
 - Library name and repository: `okay-facts` (private or public — the operator decides; the product name for
   businesses may differ).
 - Which Workers AI model reaches L3 reliably (stage 3 decides).
