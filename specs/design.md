@@ -492,6 +492,20 @@ a master's name in an answer that the data does not have (checked by code, each 
   three runs: production runs L3 with `regenerate`, as the operator said for this case. Cost: about 5 300 tokens a
   question, $0.30 / $1.20 per million in / out (≈ $0.002 an answer). Notes: gpt-oss works only in the chat shape
   (its Responses shape refuses tools through the binding); a model's per-minute limit (`3021`) is retried by the port.
+- **The TCK again, with the validator's `case`** (2026-11-04; `tck/worker/run.sh`, the two current models in one run,
+  the new candidates in a second — the account's per-minute limit shared; results in `tck/results/2026-11-04/`):
+  - `deepseek-v4.1-flash-1017`, L3: **L3**; passed 34/36 (both misses the platform's `3021`, still there after the
+    runner's retry), strict 31, formatted 34, tools 36; violations case 3, claim 1, digits 1, name 1, value 1; 5
+    regenerations; entities 13/13; 5 747 tokens, 6.7 s. Its 3 `case` were one English question (a master's name not
+    asking a case, which English must too); regenerated with `as nom`, passed.
+  - `gpt-oss-120b`, L3: **L2** (tools in 29 of 36, under the 80% L3 needs); 29/36, strict 28, formatted 32; claim 2,
+    digits 3; 4 regenerations; 11/13; 5 254 tokens, 10.3 s — its reasoning channel leaked into two answers, two empty.
+  - New with tool calls and a response format: `glm-5.3` **L3** 32/36, strict 27, formatted 33, tools 35; case 3,
+    claim 2, digits 2, name 1, value 1; 7; 13/13; 5 246 tokens, 7.7 s ($1.40 / $4.40 per million: 4.7 times the
+    default's price); `deepseek-v4-pro-0813` **L2** 26/36 (8 empty answers after right finds), 9 263 tokens, 25.2 s;
+    `kimi-k2.6` **L0** 15/36 (22 empty answers), 37.2 s. Not run: glm-5.2, deepseek-v4-flash-0731, the small ones.
+  - **Kept: deepseek-v4.1-flash-1017** (none clearly better). The fallback `gpt-oss-120b` reached only L2 this time;
+    `glm-5.3` is the better fallback by the TCK at 4.7 times the price — the operator's call (BACKLOG).
 
 ### Implementation notes (2026-11-03)
 

@@ -1,0 +1,608 @@
+{
+  "model": "@cf/zai-org/glm-5.3",
+  "run": "L3",
+  "reached": "L3",
+  "recommended": "L3 with policy regenerate",
+  "questions": 36,
+  "passed": 32,
+  "strict": 27,
+  "formatted": 33,
+  "tooled": 35,
+  "failures": 1,
+  "regenerations": 7,
+  "violations": {
+    "case": 3,
+    "claim": 2,
+    "digits": 2,
+    "name": 1,
+    "value": 1
+  },
+  "reached_entities": "13/13",
+  "tokens_per_question": 5246,
+  "ms_per_question": 7741,
+  "outcomes": [
+    {
+      "id": "price-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Strzyżenie + broda kosztuje 90,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3430,
+      "ms": 2046,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫",
+        "{\"params\": {\"p\": \"price(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} kosztuje {p}.\"}"
+      ]
+    },
+    {
+      "id": "duration-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Usługa Strzyżenie + broda trwa 45 minut.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3455,
+      "ms": 1485,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie broda\"}⟫",
+        "{\"params\": {\"d\": \"duration(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"Usługa {s} trwa {d}.\"}"
+      ]
+    },
+    {
+      "id": "slots-pl",
+      "passed": true,
+      "strict": false,
+      "rendered": "Tak, Strzyżenie + broda — jutro po południu mamy wolne: 17:30 (mistrz: Marek) oraz 18:15 (mistrz: Kuba). Który termin mam zarezerwować?",
+      "violations": [
+        "case",
+        "case"
+      ],
+      "regenerations": 1,
+      "tokens": 7750,
+      "ms": 13305,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"broda\"}⟫",
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"service = #v1\",\"date = tomorrow\",\"time >= 17:00\",\"available = true\"]}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"t1\": \"time(#s1)\", \"m1\": \"name(master(#s1))\", \"t2\": \"time(#s2)\", \"m2\": \"name(master(#s2))\"}, \"template\": \"Tak, {s} — jutro po południu mamy wolne: {t1} ({m1}) oraz {t2} ({m2}). Który termin mam zarezerwować?\"}",
+        "{\"params\": {\"s\": \"name(#v1)\", \"t1\": \"time(#s1)\", \"m1\": \"name(master(#s1)) as nom\", \"t2\": \"time(#s2)\", \"m2\": \"name(master(#s2)) as nom\"}, \"template\": \"Tak, {s} — jutro po południu mamy wolne: {t1} (mistrz: {m1}) oraz {t2} (mistrz: {m2}). Który termin mam zarezerwować?\"}"
+      ]
+    },
+    {
+      "id": "master-pl",
+      "passed": false,
+      "strict": false,
+      "rendered": "",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 6021,
+      "ms": 10487,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"date = tomorrow\",\"time = 17:30\",\"service = strzyżenie z brodą\"]}⟫",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": "cheaper-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Strzyżenie męskie kosztuje 70,00 zł, a Strzyżenie + broda — 90,00 zł. Tańsze jest Strzyżenie męskie.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5975,
+      "ms": 16631,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie męskie\"}⟫ ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫",
+        "",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"p1\": \"price(#v1)\", \"s2\": \"name(#v2)\", \"p2\": \"price(#v2)\", \"c1\": \"price(#v1) < price(#v2)\", \"c2\": \"price(#v2) < price(#v1)\"}, \"template\": \"{s1} kosztuje {p1}, a {s2} — {p2}. {c1, select, true {Tańsze jest {s1}.} other {{c2, select, true {Tańsze jest {s2}.} other {Ceny są takie same.}}}}\"}"
+      ]
+    },
+    {
+      "id": "difference-pl",
+      "passed": true,
+      "strict": false,
+      "rendered": "Strzyżenie + broda jest droższe od Strzyżenie męskie o 20,00 zł.",
+      "violations": [
+        "claim",
+        "digits",
+        "claim"
+      ],
+      "regenerations": 2,
+      "tokens": 12564,
+      "ms": 24800,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫ ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie męskie\"}⟫",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"s2\": \"name(#v2)\", \"d\": \"price(#v1) - price(#v2)\"}, \"template\": \"{s1} jest o {d} droższe niż {s2}.\"}",
+        "",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"s2\": \"name(#v2)\", \"d\": \"price(#v1) - price(#v2)\", \"c\": \"price(#v1) > price(#v2)\"}, \"template\": \"{c, select, true {{s1} jest droższe od {s2} o {d}.} other {{s",
+        "",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"s2\": \"name(#v2)\", \"d\": \"price(#v1) - price(#v2)\", \"c\": \"price(#v1) > price(#v2)\"}, \"template\": \"{c, select, true {{s1} jest droższe od {s2} o {d}.} other {{s1} jest tańsze od {s2} o {d}.}}\"}"
+      ]
+    },
+    {
+      "id": "voucher-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Voucher prezentowy kosztuje 100,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3359,
+      "ms": 1452,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"voucher\"}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"p\": \"price(#v1)\"}, \"template\": \"{s} kosztuje {p}.\"}"
+      ]
+    },
+    {
+      "id": "address-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Znajdziesz nas pod adresem: ul. Przykładowa 1, 30-001 Kraków. Zapraszamy do Barber Demo!",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3486,
+      "ms": 17184,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\"}⟫",
+        "{\"params\": {\"a\": \"address(#shop1)\", \"n\": \"name(#shop1)\"}, \"template\": \"Znajdziesz nas pod adresem: {a}. Zapraszamy do {n}!\"}"
+      ]
+    },
+    {
+      "id": "rating-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Nasza średnia ocena to 4,8.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3772,
+      "ms": 7936,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\",\"scope\":\"#shop1\"}⟫",
+        "{\"params\": {\"r\": \"rating(#shop1)\"}, \"template\": \"Nasza średnia ocena to {r}.\"}"
+      ]
+    },
+    {
+      "id": "reviews-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Mamy 23 opinie opinie.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 4046,
+      "ms": 6067,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Review\",\"scope\":\"#shop1\"}⟫",
+        "{\"params\": {\"n\": \"reviews(#shop1)\"}, \"template\": \"{n, plural, one {Mamy jedną opinię.} few {Mamy {n} opinie.} many {Mamy {n} opinii.} other {Mamy {n} opinii.}}\"}"
+      ]
+    },
+    {
+      "id": "absent-pl",
+      "passed": false,
+      "strict": false,
+      "rendered": "Niestety, w naszym salonie nie oferujemy koloryzacji włosów. Mamy natomiast: Strzyżenie + broda za 90,00 zł, Strzyżenie męskie za 70,00 zł oraz Voucher prezentowy za 100,00 zł. Czy coś z tego Cię interesuje?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5365,
+      "ms": 2152,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"koloryzacja\"}⟫",
+        " ⟪find {\"class\":\"Service\",\"text\":\"farbowanie\"}⟫ ⟪find {\"class\":\"Service\",\"limit\":10}⟫",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"s2\": \"name(#v2)\", \"s3\": \"name(#v3)\", \"p1\": \"price(#v1)\", \"p2\": \"price(#v2)\", \"p3\": \"price(#v3)\"}, \"template\": \"Niestety, w naszym salonie nie oferujemy koloryzacji włosów. Mamy natomiast: {s1} za {p1}, {s2} za {p2} oraz {s3} za {p3}. Czy coś z tego Cię interesuje?\"}"
+      ]
+    },
+    {
+      "id": "absent-manicure-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Niestety, w tym salonie nie robimy manicure. Jesteśmy barberem — oferujemy: Strzyżenie + broda, Strzyżenie męskie oraz Voucher prezentowy.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5231,
+      "ms": 2328,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\"}⟫",
+        " ⟪find {\"class\":\"Service\",\"limit\":5}⟫",
+        "{\"params\": {\"s1\": \"name(#v1)\", \"s2\": \"name(#v2)\", \"s3\": \"name(#v3)\"}, \"template\": \"Niestety, w tym salonie nie robimy manicure. Jesteśmy barberem — oferujemy: {s1}, {s2} oraz {s3}.\"}"
+      ]
+    },
+    {
+      "id": "price-en",
+      "passed": true,
+      "strict": true,
+      "rendered": "Haircut + beard costs 90.00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3368,
+      "ms": 1475,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"haircut with beard\"}⟫",
+        "{\"params\": {\"p\": \"price(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} costs {p}.\"}"
+      ]
+    },
+    {
+      "id": "price-uk",
+      "passed": true,
+      "strict": true,
+      "rendered": "Стрижка + борода коштує 90,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3505,
+      "ms": 1748,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"стрижка з бородою\"}⟫ ⟪find {\"class\":\"Service\",\"text\":\"haircut beard\"}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"p\": \"price(#v1)\"}, \"template\": \"{s} коштує {p}.\"}"
+      ]
+    },
+    {
+      "id": "duration-ru",
+      "passed": true,
+      "strict": true,
+      "rendered": "Стрижка + борода длится 45 минут.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3549,
+      "ms": 2642,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"beard\"}⟫ ⟪find {\"class\":\"Service\",\"text\":\"борода\"}⟫",
+        "{\"params\": {\"d\": \"duration(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} длится {d}.\"}"
+      ]
+    },
+    {
+      "id": "duration-en",
+      "passed": true,
+      "strict": false,
+      "rendered": "Men's haircut takes 30 minutes.",
+      "violations": [
+        "name"
+      ],
+      "regenerations": 1,
+      "tokens": 4770,
+      "ms": 4664,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"men's haircut\"}⟫",
+        "{\"params\": {\"d\": \"duration(#v1)\"}, \"template\": \"The men's haircut takes {d}.\"}",
+        "{\"params\": {\"s\": \"name(#v1)\", \"d\": \"duration(#v1)\"}, \"template\": \"{s} takes {d}.\"}"
+      ]
+    },
+    {
+      "id": "slots-uk",
+      "passed": true,
+      "strict": true,
+      "rendered": "Так! Завтра є вільний час на чоловічу стрижку о 10:00 (майстер: Ewa), ціна — 70,00 zł. Хочете забронювати?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5715,
+      "ms": 14795,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"стрижка\"}⟫",
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"service = #v2\",\"date = tomorrow\",\"available = true\"]}⟫",
+        "{\"params\": {\"t\": \"time(#s1)\", \"p\": \"price(#s1)\", \"m\": \"name(master(#s1)) as nom\"}, \"template\": \"Так! Завтра є вільний час на чоловічу стрижку о {t} (майстер: {m}), ціна — {p}. Хочете забронювати?\"}"
+      ]
+    },
+    {
+      "id": "earliest-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Najwcześniejszy wolny termin jutro na Strzyżenie + broda to środa, 4 listopada, 11:00 (mistrz: Marek). Chcesz, żebym zarezerwował?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5912,
+      "ms": 6627,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫",
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"service = #v1\",\"date = tomorrow\"]}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"t\": \"time(argmin(time, #s1, #s2, #s3)) as datetime\", \"m\": \"name(master(argmin(time, #s1, #s2, #s3))) as nom\"}, \"template\": \"Najwcześniejszy wolny termin jutro na {s} to {t} (mistrz: {m}). Chcesz, żebym zarezerwował?\"}"
+      ]
+    },
+    {
+      "id": "budget-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Tak, Strzyżenie + broda mieści się w Twoim budżecie — kosztuje 90 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3946,
+      "ms": 3443,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫",
+        "{\"params\": {\"c\": \"price(#v1) <= 100 PLN\", \"s\": \"name(#v1)\", \"p\": \"price(#v1) as short\"}, \"template\": \"{c, select, true {Tak, {s} mieści się w Twoim budżecie — kosztuje {p}.} other {Niestety, {s} nie mieści się w Twoim budżecie — kosztuje {p}.}}\"}"
+      ]
+    },
+    {
+      "id": "hybrid-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Manicure hybrydowy kosztuje 110,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3440,
+      "ms": 1192,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"text\":\"hybrydowy\"}⟫",
+        "{\"params\": {\"p\": \"price(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} kosztuje {p}.\"}"
+      ]
+    },
+    {
+      "id": "pedicure-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Pedicure trwa 1 godzina 15 minut.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3384,
+      "ms": 1297,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"pedicure\"}⟫",
+        "{\"params\": {\"d\": \"duration(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} trwa {d}.\"}"
+      ]
+    },
+    {
+      "id": "morning-en",
+      "passed": true,
+      "strict": true,
+      "rendered": "Yes! We have a free Hybrid manicure slot on 4 November at 10:00. Would you like to book it?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5673,
+      "ms": 11697,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"date = tomorrow\",\"time < 12:00\",\"service = hybrid\",\"available = true\"]}⟫",
+        "",
+        "{\"params\": {\"s\": \"name(#s1)\", \"d\": \"date(#s1)\", \"t\": \"time(#s1)\"}, \"template\": \"Yes! We have a free {s} slot on {d} at {t}. Would you like to book it?\"}"
+      ]
+    },
+    {
+      "id": "classic-ru",
+      "passed": true,
+      "strict": true,
+      "rendered": "Классический маникюр стоит 80,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3410,
+      "ms": 6746,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"text\":\"classic\"}⟫",
+        "{\"params\": {\"p\": \"price(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"{s} стоит {p}.\"}"
+      ]
+    },
+    {
+      "id": "address-uk",
+      "passed": true,
+      "strict": false,
+      "rendered": "Ми знаходимося за адресою: ul. Testowa 3, 50-001 Wrocław, Wrocław. Ласкаво просимо!",
+      "violations": [
+        "value"
+      ],
+      "regenerations": 1,
+      "tokens": 3365,
+      "ms": 2535,
+      "failure": null,
+      "raw": [
+        "{\"params\": {\"a\": \"address(#shop1)\", \"c\": \"city(#shop1)\", \"h\": \"hours(#shop1)\"}, \"template\": \"Ми знаходимося за адресою: {a}, {c}. Час роботи: {h}. Ласкаво просимо!\"}",
+        "{\"params\": {\"a\": \"address(#shop1)\", \"c\": \"city(#shop1)\"}, \"template\": \"Ми знаходимося за адресою: {a}, {c}. Ласкаво просимо!\"}"
+      ]
+    },
+    {
+      "id": "cheapest-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Najtańszy jest Manicure klasyczny — 80,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3549,
+      "ms": 2100,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"scope\":\"#shop1\"}⟫",
+        "{\"params\": {\"s\": \"name(argmin(price, #v1, #v2))\", \"p\": \"price(argmin(price, #v1, #v2))\"}, \"template\": \"Najtańszy jest {s} — {p}.\"}"
+      ]
+    },
+    {
+      "id": "mall-manicure-pl",
+      "passed": false,
+      "strict": false,
+      "rendered": "",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 6471,
+      "ms": 15445,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"limit\":10,\"where\":[\"price <= 150 PLN\"]}⟫ ⟪find {\"class\":\"Slot\",\"limit\":10,\"where\":[\"date = tomorrow\",\"time <= 12:00\",\"price <= 150 PLN\",\"service = manicure\",\"available = true\"]}⟫",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": "mall-krakow-en",
+      "passed": true,
+      "strict": true,
+      "rendered": "You can get a manicure in Kraków at Paznokcie Ola — they offer Japanese manicure for 140.00 zł. Would you like to book it?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3411,
+      "ms": 2078,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"limit\":10,\"where\":[\"shop.city = Kraków\"]}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"shop\": \"name(shop(#v1))\", \"p\": \"price(#v1)\"}, \"template\": \"You can get a manicure in Kraków at {shop} — they offer {s} for {p}. Would you like to book it?\"}"
+      ]
+    },
+    {
+      "id": "mall-cheapest-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Najtańszy manicure — Manicure klasyczny — jest w salonie Studio Paznokci Lila i kosztuje 80,00 zł. Chcesz, żebym otworzył ten salon albo pokazał wolne terminy?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3712,
+      "ms": 3008,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Manicure\",\"limit\":20}⟫",
+        "{\"params\": {\"s\": \"name(argmin(price, #v1, #v2, #v3))\", \"shop\": \"name(shop(argmin(price, #v1, #v2, #v3)))\", \"p\": \"price(argmin(price, #v1, #v2, #v3))\"}, \"template\": \"Najtańszy manicure — {s} — jest w salonie {shop} i kosztuje {p}. Chcesz, żebym otworzył ten salon albo pokazał wolne terminy?\"}"
+      ]
+    },
+    {
+      "id": "mall-haircut-ru",
+      "passed": true,
+      "strict": true,
+      "rendered": "В Кракове можно постричься в «Barber Demo» — там есть услуги «Стрижка + борода» (90,00 zł) и «Мужская стрижка» (70,00 zł). Открыла карточку салона, можно выбрать услугу и записаться. «Paznokcie Ola» — это маникюрный салон, стрижки там нет.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 8098,
+      "ms": 5518,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\",\"limit\":5,\"text\":\"hair\",\"where\":[\"city = Kraków\"]}⟫ ⟪find {\"class\":\"Service\",\"limit\":5,\"text\":\"стрижка\",\"where\":[\"shop.city = Kraków\"]}⟫ ⟪find {\"class\":\"Service\",\"limit\":5,\"text\":\"haircut\",\"where\":[\"shop.city = Kraków\"]}⟫",
+        " ⟪find {\"class\":\"Shop\",\"limit\":5,\"where\":[\"city = Kraków\"]}⟫",
+        " ⟪open {\"shop\":\"#shop1\"}⟫",
+        "{\"params\": {\"s1\": \"name(#shop1)\", \"s2\": \"name(#shop2)\", \"v1\": \"name(#v1)\", \"v2\": \"name(#v2)\", \"p1\": \"price(#v1)\", \"p2\": \"price(#v2)\"}, \"template\": \"В Кракове можно постричься в «{s1}» — там есть услуги «{v1}» ({p1}) и «{v2}» ({p2}). Открыла карточку салона, можно выбрать услугу и записаться. «{s2}» — это маникюрный салон, стрижки там нет.\"}"
+      ]
+    },
+    {
+      "id": "mall-wroclaw-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "We Wrocławiu mamy jeden sklep: Studio Paznokci Lila (paznokcie).",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3589,
+      "ms": 2226,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\",\"where\":[\"city = Wrocław\"]}⟫",
+        "{\"params\": {\"s\": \"name(#shop1)\", \"c\": \"category(#shop1)\", \"n\": \"count(#shop1)\"}, \"template\": \"We Wrocławiu mamy {n, plural, one {jeden sklep} few {# sklepy} many {# sklepów} other {# sklepu}}: {s} ({c}).\"}"
+      ]
+    },
+    {
+      "id": "mall-rating-en",
+      "passed": true,
+      "strict": true,
+      "rendered": "Paznokcie Ola has the better rating (4.9 vs 4.6).",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3797,
+      "ms": 3986,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\",\"text\":\"nail\"}⟫",
+        "{\"params\": {\"a\": \"name(#shop1)\", \"b\": \"name(#shop2)\", \"r1\": \"rating(#shop1)\", \"r2\": \"rating(#shop2)\", \"c\": \"rating(#shop1) > rating(#shop2)\", \"e\": \"rating(#shop1) = rating(#shop2)\"}, \"template\": \"{e, select, true {Both studios have the same rating ({r1}).} other {{c, select, true {{a} has the better rating ({r1} vs {r2}).} other {{b} has the better rating ({r2} vs {r1}).}}}}\"}"
+      ]
+    },
+    {
+      "id": "book-pl",
+      "passed": false,
+      "strict": false,
+      "rendered": "",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3711,
+      "ms": 2518,
+      "failure": "\"AiError: 3021: rate limiting: inference request per min rate reached\"",
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫ ⟪find {\"class\":\"Slot\",\"where\":[\"date = tomorrow\",\"time = 17:30\"]}⟫",
+        " ⟪book {\"slot\":\"#s1\"}⟫",
+        ""
+      ]
+    },
+    {
+      "id": "open-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Otworzyłam stronę Studio Paznokci Lila (Wrocław). Miłego przeglądania!",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 5119,
+      "ms": 7902,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Shop\",\"text\":\"paznokci\",\"where\":[\"city = Wrocław\"]}⟫",
+        " ⟪open {\"shop\":\"#shop1\"}⟫",
+        "{\"params\": {\"s\": \"name(#shop1)\", \"c\": \"city(#shop1)\"}, \"template\": \"Otworzyłam stronę {s} ({c}). Miłego przeglądania!\"}"
+      ]
+    },
+    {
+      "id": "flow-en",
+      "passed": true,
+      "strict": false,
+      "rendered": "Sure! Two options here: Haircut + beard — 90 zł, cheaper than the manicure; Men's haircut — 70 zł, cheaper than the manicure. Which one shall I book?",
+      "violations": [
+        "case",
+        "digits"
+      ],
+      "regenerations": 2,
+      "tokens": 25466,
+      "ms": 50561,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Slot\",\"limit\":10,\"where\":[\"date = tomorrow\",\"time < 12:00\",\"price <= 150 PLN\",\"service = manicure\"]}⟫",
+        "",
+        "",
+        " ⟪find {\"class\":\"Slot\",\"where\":[\"date = tomorrow\",\"time = 10:00\",\"price <= 150 PLN\",\"available = true\"]}⟫",
+        " ⟪book {\"slot\":\"#s1\"}⟫",
+        "{\"params\":{\"s\":\"name(#s1)\",\"t\":\"time(#s1) as short\",\"p\":\"price(#s1) as short\",\"d\":\"duration(#s1)\",\"m\":\"name(master(#s1))\"},\"template\":\"Yes! {s} is free tomorrow at {t} — {p}, {d}, with {m}. I've opened a booking card for you to confirm.\"}",
+        "{\"params\":{\"s\":\"name(#s1)\",\"t\":\"time(#s1) as short\",\"p\":\"price(#s1) as short\",\"d\":\"duration(#s1)\",\"m\":\"name(master(#s1)) as ins\"},\"template\":\"Yes! {s} is free tomorrow at {t} — {p}, {d}, {m, select, sure {with {m}} other {(master: {m})}}. I've opened a booking card for you to confirm.\"}",
+        " ⟪find {\"class\":\"Service\",\"text\":\"haircut\",\"where\":[\"price < price(#s1)\"]}⟫",
+        "",
+        "{\"params\":{\"s1\":\"name(#v1)\",\"p1\":\"price(#v1) as short\",\"c1\":\"price(#v1) < price(#s1)\",\"s2\":\"name(#v2)\",\"p2\":\"price(#v2) as short\",\"c2\":\"price(#v2) < price(#s1)\"},\"template\":\"Sure! Two options here: {s1}",
+        "{\"params\":{\"s1\":\"name(#v1)\",\"p1\":\"price(#v1) as short\",\"c1\":\"price(#v1) < price(#s1)\",\"s2\":\"name(#v2)\",\"p2\":\"price(#v2) as short\",\"c2\":\"price(#v2",
+        "{\"params\":{\"s1\":\"name(#v1)\",\"p1\":\"price(#v1) as short\",\"c1\":\"price(#v1) < price(#s1)\",\"s2\":\"name(#v2)\",\"p2\":\"price(#v2) as short\",\"c2\":\"price(#v2) < price(#s1)\"},\"template\":\"Sure! Two options here: {s1} — {p1}, {c1, select, true {cheaper than the manicure} other {not cheaper than the manicure}}; {s2} — {p2}, {c2, select, true {cheaper than the manicure} other {not cheaper than the manicure}}. Which one shall I book?\"}"
+      ]
+    },
+    {
+      "id": "digits-pl",
+      "passed": true,
+      "strict": true,
+      "rendered": "Przepraszam, ale nie mogę wpisać ceny własnymi cyframi — mogę ją tylko wyświetlić przez system: Strzyżenie + broda kosztuje 90,00 zł.",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3897,
+      "ms": 5842,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"strzyżenie z brodą\"}⟫",
+        "{\"params\": {\"s\": \"name(#v1)\", \"p\": \"price(#v1)\"}, \"template\": \"Przepraszam, ale nie mogę wpisać ceny własnymi cyframi — mogę ją tylko wyświetlić przez system: {s} kosztuje {p}.\"}"
+      ]
+    },
+    {
+      "id": "invent-en",
+      "passed": true,
+      "strict": true,
+      "rendered": "I'd rather not guess numbers — but I can show you the real thing: Haircut + beard costs 90.00 zł. Want me to look for a beard trim alone or a free slot?",
+      "violations": [],
+      "regenerations": 0,
+      "tokens": 3546,
+      "ms": 12770,
+      "failure": null,
+      "raw": [
+        " ⟪find {\"class\":\"Service\",\"text\":\"beard trim\"}⟫",
+        "{\"params\": {\"p\": \"price(#v1)\", \"s\": \"name(#v1)\"}, \"template\": \"I'd rather not guess numbers — but I can show you the real thing: {s} costs {p}. Want me to look for a beard trim alone or a free slot?\"}"
+      ]
+    }
+  ]
+}
