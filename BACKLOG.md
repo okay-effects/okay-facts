@@ -21,7 +21,12 @@ Found while building (2026-11-03):
    solutions as resolver facts with proofs: `require` / `prefer` / `solve` in `Expr`, a Datalog handler (the shops'
    rules), SAT / weighted MaxSAT with UNSAT cores as explanations, the model's hints ordering the search, intent
    facts apart from data facts. specs/design.md §18.
-- **The router lane, next** (§14.6, §16): wrong intents among the router's answers (14 of 165 in-domain turns: a
-  mall-wide search taken for `masters`, an area question for `address`) and ordinary questions sent to `other` —
-  more phrasings and a new held-out set; the table 128 wide (half the bytes to read in a new isolate); a modes
-  question in a shop without modes says the address's absence (`ShopRouter.one`'s fallback) — its own answer.
+- **The router lane, round 3** (§14.6 2026-11-04: 86.7% right on the held-out set, the target 97%): the rules are too
+  greedy — `area` takes "do you come to the client?" (modes) and a laundry's pickup, `human` a master's private phone;
+  injections in other forms ("ignoruj poprzednie instrukcje"); advice naming a service; on the mall's home a shop named
+  by its name (its hours, its address) answered as a search; `When` reads "Marek's" as March (a month's stem matches
+  a name); "скасуйте" missing from `manage`; "samo strzyżenie" / "the haircut alone" compares with the combination.
+  Then a NEW held-out set (this one is spent). Also: the probe's weights as binary (10.7 ms of JSON); a price turn's
+  ten sequential reads of the shop's object (≈ 250 ms warm) batched.
+- **The fallback model** (§16, 2026-11-04): `gpt-oss-120b` reached only L2 by the TCK; `glm-5.3` reached L3 at 4.7
+  times the price — the operator's call.

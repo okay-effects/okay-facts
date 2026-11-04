@@ -27,7 +27,8 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   3. okay-mall: the table in R2 (read on an isolate's first request; the host from its blobs' file), the turn
      decision in `ChatObject` (lane/intent/confidence logged), the Directory's semantic scorer; the 150-turn set and
      the measurement; deploy; verify-apex 27/27.
-- [ ] **router lane, round 2** (BACKLOG "The router lane, next"; operator 2026-11-03) — accuracy, cold start, the TCK
+- [x] **router lane, round 2** (done 2026-11-04: released okay-facts, okay-shop, okay-serverless 0.1.0; okay-mall
+  deployed; §14.6 the held-out row, §16 the decisions; round 3 in BACKLOG) (BACKLOG "The router lane, next"; operator 2026-11-03) — accuracy, cold start, the TCK
   with `case`, the modes bug, measured again on a NEW frozen held-out set. Plan:
   1. Error analysis of every miss of measure/2026-11-03 (intent, slots), by cause → okay-mall measure/2026-11-04/.
   2. Held-out set (≥200 new turns, another author, 4 languages, out-of-domain and adversarial) written and FROZEN

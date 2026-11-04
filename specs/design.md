@@ -427,6 +427,28 @@ a master's name in an answer that the data does not have (checked by code, each 
   256 wide (PCA keeps 99.3% of the variance; 128 wide would keep 92.7% with the same held-out intent accuracy),
   7.1 MB in half precision. The probe on held-out authored rows (every 5th): 92% right, 94% among the confident.
 
+**Again, 2026-11-04** (the router lane's round 2, §16; okay-mall `measure/2026-11-04/report.md`): a NEW held-out set,
+340 turns by an author who never saw the phrasings (pl 147, uk 64, ru 61, en 68; 49 for the model — advice,
+rule-breaking, others' data, out of domain, nonsense; typos, no diacritics, Latin letters, mixed languages, follow-ups),
+frozen before any tuning (sha256 `4fd0ac90…a19e`), run once; the lanes one after another, paced — the platform refused
+none. The rows of 2026-11-03 above are kept for comparison (another set: 180 turns).
+
+| lane (2026-11-04, 340 held-out turns) | answered by the router | wrong facts | tokens a turn | cost a turn | latency p50 / p95 |
+|---|---|---|---|---|---|
+| auto (router, model behind) | 270 of 340 (79%) | 0 | 1 117 | $0.00043 | 23 ms / 7.8 s |
+| model lane alone | — | 0 (5 flagged: a visit's fee in a card's price, a sum — the resolver's) | 6 288 | $0.00234 | 5.0 s / 15.8 s |
+| usual (data in the prompt) | — | 0 (7 flagged: a 15-minute step, the user's own numbers) | 4 540 | $0.00152 | 2.3 s / 5.1 s |
+
+- **The router on the held-out set**: its intent right in 234 of its 270 answers (**86.7%** — the target of 97% NOT
+  met); slots right 215 of 225 (95.6%); 30 in-domain turns declined, 9 meant for the model answered; the model lane's
+  share 20.6%. 31 of the 36 wrong are by rules: "do you come to the client?" (modes) taken for `area` (10), a laundry's
+  pickup for `area` (2), injections and advice the rules lack (9 meant for the model), a price or a named shop's hours
+  on the mall's home answered as a search (7). On the train/dev turns of 2026-11-03 the same router: 98.8% and 100%.
+  In the router's own time p50 16 ms, p95 51 ms; the model behind it p50 6.1 s.
+- **Cold start** (production): a new conversation's first answer p50 1.9 s → 0.74 s (p95 0.94 s) as the widget does
+  (the chat's open warms the conversation's object; the table read in place); a message with no open first 1.70 s; the
+  table's loading CPU in a fresh isolate 102–139 ms (was ≈ 0.4–0.6 s).
+
 ## 15. Gotchas
 
 - Non-unique links make paths wrong silently (an averaged value belonging to nobody): enforce functionality.
@@ -506,6 +528,27 @@ a master's name in an answer that the data does not have (checked by code, each 
     `kimi-k2.6` **L0** 15/36 (22 empty answers), 37.2 s. Not run: glm-5.2, deepseek-v4-flash-0731, the small ones.
   - **Kept: deepseek-v4.1-flash-1017** (none clearly better). The fallback `gpt-oss-120b` reached only L2 this time;
     `glm-5.3` is the better fallback by the TCK at 4.7 times the price — the operator's call (BACKLOG).
+
+### The router lane, round 2 (2026-11-04; §14.6, §17)
+
+- **Data first**: okay-shop's phrasings 744 → ~1 000 (typos, no diacritics, Latin letters, mixed languages, short
+  follow-ups, harder `other`: payments, advice, others' data, injections), rules for `other` (rank 5: injections,
+  others' data, payments and amenities, advice), compare (`najtaniej`, "cheaper option"), area (pickup, cover), hours
+  (opening and closing times), reviews, human (an administrator's phone), greetings with "that's all".
+- **Features where data cannot**: a host's `Lexicon` (words of one thing, a verb's prefix passed over, words that say
+  nothing ignored), a name's words by their rarity among the candidates and the words it accounts for (`Nearest`);
+  `When`: the weekend, Ukrainian and Russian in Latin letters; the host's (okay-shop's `ShopRouter`): a short
+  follow-up takes the last question's intent, the words' evidence (a service or a master, and a time) beside an unsure
+  probe, a person not the shop's, the conversation's service the one its last answer named, the answer's own intent
+  reported (a shop's question answered by a search is a search), what a shop has not given said honestly (the modes
+  bug: a ways-of-working question said the address' absence).
+- **Threshold**: p ≥ 0.7, margin ≥ 0.2 — on held-out authored rows (every 5th) what the router would answer is right
+  97.1% at it (96.2% at 0.6), on the train/dev turns 98.8–100%; the held-out set: 86.7% (§14.6) — its wrong ones are
+  by rules (p = 1), which no threshold reaches. Not met; next: below.
+- **The table**: 256 wide in int8 (a byte a dimension, a scale a row) — 4.47 MB, the same held-out accuracy as half
+  precision; 128 wide (2.48 MB) lost 1.7 points of intents on the train/dev turns (more than the 1 allowed): kept 256.
+  Read in place from a view of R2's bytes (okay-serverless' `Blobs.view`, released 2026-11-04): no copy; the chat's
+  first open warms the conversation's object (okay-mall).
 
 ### Implementation notes (2026-11-03)
 
