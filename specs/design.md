@@ -627,8 +627,8 @@ the demo shops' data (pl 128, uk 64, ru 64, en 64; 51 for the model, 20 injectio
   takes), on 2026-11-03's 180 and dev 45, 2026-11-04's 340, round 3's 320 (all now dev data) and the intents'
   1 130 phrasings: **11 before → 1 after** (round 3: "warto do was iść?", "dziewczyny polecacie?" — reviews —, "як
   написати адміністрації торгового центру?" — "торг" was bargaining —; phrasings: "co zrobić?" after "nie dam rady
-  jutro" in four languages — manage —, "ile płacę za …" three times — price —, "czy jest parking przy was?"). The one left: "czy jest parking przy
-  was?" (a phrasing of `address`), now an amenity's answer that gives the address. Turns meant for the model the guard
+  jutro" in four languages — manage —, "ile płacę za …" three times — price —, "czy jest parking przy was?" —
+  address). The one left is the last, now an amenity's answer that gives the address. Turns meant for the model the guard
   takes: 87 of 118 → 104 of 118 (the rest go to the combiner, its `other` to the model lane).
 
 ### Implementation notes (2026-11-03)
