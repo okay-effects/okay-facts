@@ -74,3 +74,17 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   3. okay-mall: the answers taken (no model), counters per category in the shop's chat counts and the home's, the
   dashboard's chat column, a strike count per conversation (3 injections or others' data → 10 minutes of the fixed
   answer); tests; deploy; verify-apex 27/27; screenshots.
+- [ ] **router lane, round 4** (operator 2026-11-04, after the guard answers; §17 "Round 4"). Plan (spec first;
+  releases under 0.1.0; okay-mall deployed; verify-apex 27/27):
+  0. A NEW held-out set (≥250 turns, an independent author who saw only the demo shops' data) written and FROZEN
+     (sha256) in okay-mall measure/2026-11-04-r4/ before any tuning; run once.
+  1. okay-facts: `Places` (gazetteer matching), `tools/gazetteer.scala` (forms generated: Polish declension,
+     Ukrainian/Russian transliteration and declension, exonyms), `Prop.comparableBy` and the violation `comparable`;
+     tests; release.
+  2. okay-shop: `assistant/places.tsv` (cities over 20 000 — GUS 2021 —, the districts of the 10 largest cities,
+     the demo shops' places; names as TERYT has them) → `places.json`; the place slot and area answers by it; a shop
+     named on the mall's home in both scripts with typos; the mall's own contact; `kind` of a service (`About.kinds`)
+     and comparisons of the same kind only (`compare.none.kind`); the confusion's pairs fixed by evidence and the
+     close ones asked back (`clarify` with suggestions; the widget's buttons); tests; release.
+  3. okay-mall: the kinds from the catalogue; the gazetteer in the search and the geocoder; the mall's contact as a
+     fact; the measurement (auto) on the new set beside the old rows, the guard's false positives on it; deploy.
