@@ -22,18 +22,26 @@ object Intents:
       Lang.parse(k).map(_ -> strs(v))).toMap }.getOrElse(Map.empty), i.field("safe").map(strs).getOrElse(Vector.empty))
   }
 
-  /** the guard's patterns: a turn that matches one goes to the model lane (injections, others' data, payments,
-   * advice, out of domain) */
-  def guard(json: String): Vector[String] = Json.fromText(json).field("guard").map(strs).getOrElse(Vector.empty)
+  /** the guard's patterns by category, in order — (category, pattern): a turn that matches one is answered by the
+   * host's fixed answer for its category, never by the model (injections, others' data, bargaining, payments,
+   * amenities, health, advice, out of domain); a bare pattern is of the category `guard` */
+  def guard(json: String): Vector[(String, String)] = Json.fromText(json).field("guard").toVector.flatMap {
+    case Json.Arr(xs) => xs.flatMap {
+      case Json.Str(p) => Vector("guard" -> p)
+      case o => o("patterns").list.collect { case Json.Str(p) => o("category").string -> p }
+    }
+    case _ => Vector.empty
+  }
 
   /** every example: (text, intent, language) */
   def examples(intents: Vector[Intent]): Vector[(String, String, Lang)] =
     for i <- intents; (l, xs) <- i.examples.toVector.sortBy(_._1.ordinal); x <- xs yield (x, i.name, l)
 
-/** where a message went and why (specs/design.md §17 "The turn decision"): the guard (its pattern: the model lane),
+/** where a message went and why (specs/design.md §17 "The turn decision"): the guard (its pattern, its category),
  * a safe rule (its pattern), the combiner (its calibrated probability and margin over the next), nowhere (no word of
  * it known, no rule); `rule` and `probe` are the evidence's own first guess (`glance`) */
-final case class Route(intent: String, by: String, p: Double = 0.0, margin: Double = 0.0, rule: String = ""):
+final case class Route(intent: String, by: String, p: Double = 0.0, margin: Double = 0.0, rule: String = "",
+                       guard: String = ""):
   /** confident: a safe rule, or the combiner (or the probe's glance) past both thresholds; never the guard */
   def confident(minP: Double, minMargin: Double): Boolean =
     by == "safe" || by == "rule" || ((by == "combined" || by == "probe") && p >= minP && margin >= minMargin)
@@ -45,11 +53,12 @@ final case class Route(intent: String, by: String, p: Double = 0.0, margin: Doub
  */
 final class Router(val rules: Vector[(String, String, Re)], val probe: Probe,
                    val safe: Vector[(String, String, Re)] = Vector.empty,
-                   val guard: Vector[(String, Re)] = Vector.empty,
+                   val guard: Vector[(String, String, Re)] = Vector.empty,
                    val combiner: Option[Combiner] = None):
   def byRule(text: String): Option[(String, String)] = rules.find((_, _, re) => re.test(text)).map((i, p, _) => (i, p))
   def bySafe(text: String): Option[(String, String)] = safe.find((_, _, re) => re.test(text)).map((i, p, _) => (i, p))
-  def byGuard(text: String): Option[String] = guard.find((_, re) => re.test(text)).map(_._1)
+  /** the guard's first category whose pattern matches: (category, pattern) */
+  def byGuard(text: String): Option[(String, String)] = guard.find((_, _, re) => re.test(text)).map((c, p, _) => (c, p))
   /** the intents any of whose rules match */
   def hits(text: String): Set[String] = rules.collect { case (i, _, re) if re.test(text) => i }.toSet
 
@@ -87,7 +96,7 @@ final class Router(val rules: Vector[(String, String, Re)], val probe: Probe,
   /** THE TURN'S DECISION: the guard, a safe rule, else the combiner (none: the glance) */
   def decide(table: Table, text: String, prev: Option[String] = None, extras: Map[String, Double] = Map.empty)
     : Route =
-    byGuard(text).map(g => Route("other", "guard", 1.0, 1.0, g))
+    byGuard(text).map((c, g) => Route("other", "guard", 1.0, 1.0, g, c))
       .orElse(bySafe(text).map((i, p) => Route(i, "safe", 1.0, 1.0, p)))
       .getOrElse(combiner match
         case None => glance(table, text)
@@ -99,11 +108,12 @@ final class Router(val rules: Vector[(String, String, Re)], val probe: Probe,
             Route(r.head._1, "combined", r.head._2, r.head._2 - r.lift(1).map(_._2).getOrElse(0.0)))
 
 object Router:
-  def apply(intents: Vector[Intent], probe: Probe, guard: Vector[String] = Vector.empty,
+  def apply(intents: Vector[Intent], probe: Probe, guard: Vector[(String, String)] = Vector.empty,
             combiner: Option[Combiner] = None): Router =
     val sorted = intents.sortBy(_.rank)
     new Router(sorted.flatMap(i => i.rules.map(r => (i.name, r, Rules.compile(r)))), probe,
-      sorted.flatMap(i => i.safe.map(r => (i.name, r, Rules.compile(r)))), guard.map(g => (g, Rules.compile(g))),
+      sorted.flatMap(i => i.safe.map(r => (i.name, r, Rules.compile(r)))),
+      guard.map((c, g) => (c, g, Rules.compile(g))),
       combiner)
 
   /** the evidence's own names, per class: `probe:<c>`, `rule:<c>`, `prev:<c>` */

@@ -721,12 +721,13 @@ every language, and the validator runs on the router's answers at runtime as on 
   ambiguous, the host asks.
 - **The router** (`Router`, round 3): the guard's patterns, then the safe rules, then the combiner over the evidence
   (the probe's probabilities, every intent's rule hits, a follow-up's previous intent, the host's evidence) →
-  `Route(intent, by: guard | safe | combined | unknown, p, margin)`; `confident` when safe, or the combiner's `p`
-  passes the threshold its file carries (calibrated out of fold on train/dev, §16; "The turn decision" below). A
-  rule's hit is evidence, never an answer by itself.
-- **The data** (`Intents`): `{guard: [...], intents: [{name, rank, safe: [...], rules: [...], examples: {pl: [...],
-  uk: [...], ru: [...],
-  en: [...]}}]}` — a host's own file; the probe is fitted on its examples, the table distilled over its units. The
+  `Route(intent, by: guard | safe | combined | unknown, p, margin, rule, guard)` — `guard` the guard's category when
+  it took the turn; `confident` when safe, or the combiner's `p` passes the threshold its file carries (calibrated out
+  of fold on train/dev, §16; "The turn decision" below). A rule's hit is evidence, never an answer by itself.
+- **The data** (`Intents`): `{guard: [{category, patterns: [...]}…], intents: [{name, rank, safe: [...], rules: [...],
+  examples: {pl: [...], uk: [...], ru: [...], en: [...]}}]}` — a host's own file (a bare pattern in `guard` is of the
+  category `guard`); the categories in order, the first whose pattern matches takes the turn (`Intents.guard`: the
+  pairs (category, pattern)); the probe is fitted on its examples, the table distilled over its units. The
   `Lexicon` (`{groups: [[stems…]…], ignore: [words…]}`) is the host's too.
 - **Tools** (`tools/`, scala-cli, never Python): `table.scala` (the units of a corpus embedded by the ONNX encoder —
   onnxruntime and the HuggingFace tokenizer on the JVM, the model file okay-chat fetches —, PCA, F16, the file
@@ -763,11 +764,17 @@ intent, confidence; the reads as any answer's).
 A rule that fires is not an answer: on the held-out set of 2026-11-04 31 of the router's 36 wrong intents came from
 rules answering with p = 1, which no threshold can stop. So a turn is decided in three steps, in order:
 
-1. **The guard** (`Intents.guard`, the host's patterns): a prompt injection or a question about the assistant itself
-   (ignore or forget the instructions, the system prompt, "you are now", role-play, a developer mode, a price set by
-   the user), other people's data (other clients, who booked, a master's private phone, earnings), payments and
-   amenities, advice and recommendations, out of domain (the weather, sports, code, recipes, poems) → **the model
-   lane**, never a domain answer. (The model lane is safe for these by §2: it has no value to leak.)
+1. **The guard** (`Intents.guard`, the host's patterns by category): a prompt injection or a question about the
+   assistant itself (ignore or forget the instructions, the system prompt, "you are now", role-play, a developer
+   mode), other people's data (other clients, who booked, a master's private phone, earnings), a price set by the user,
+   discounts and bargaining, payments, amenities, health, advice and recommendations, out of domain (the weather,
+   sports, code, recipes, poems) → **the host's fixed, authored answer for the category** (operator, 2026-11-04: a
+   guarded turn NEVER goes to the model lane). Not the model's, not a domain intent's: an authored `{params,
+   template}` per category and language (the turn's), through the same validator, its values only the resolver's
+   (`Bind.authored`, `by = guard`, the intent `guard.<category>`) — never the user's words echoed. The host keeps a
+   counter per category (never the text) and a strike count per conversation (injections and others' data): past
+   its limit, a cool-down of fixed answers only (a rate limit, not a ban; okay-mall). A false refusal now has no model
+   behind it, so the patterns are narrow and their false positives measured on every set (§16).
 2. **The safe rules** (`Intent.safe`, an explicitly short list — greetings, thanks, goodbyes, "help", "what can you
    do"): whole-message patterns whose answer has no fact and no slot; answered at once (`by = safe`). Nothing else is
    ever answered by a rule alone.
