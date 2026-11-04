@@ -312,3 +312,22 @@ class DistanceSuite extends Ground:
     assert(got.exists(c => c.value match
       case Value.Meters(m) => math.abs(m - 252000) < 2000 && c.facts.size == 2
       case _ => false), got)
+
+class ComparableSuite extends Ground:
+  /** the demo's schema with a service's (and a slot's) price comparable by its kind */
+  val byKind: Schema = Schema(Demo.schema.classes.map(c => if c.name == "Service" || c.name == "Slot" then
+    c.copy(props = c.props.map(p => if p.name == "price" then p.copy(comparableBy = "kind") else p)) else c))
+
+  def renderBy(a: Answer, s: Schema): Either[Vector[Violation], Rendered] = facts(Resolve[F](a, handles, s, Lang.pl))
+
+  test("comparisons only of comparable things (§17 round 4): across sources the kinds alike, within one any"):
+    val across = Answer(Vector("c" -> "price(#v2) < price(#v1)"), "{c, select, true {tak} other {nie}}")
+    assert(renderBy(across, Demo.schema).isRight, "no comparableBy: as before")
+    assertEquals(renderBy(across, byKind).left.map(_.map(_.code)), Left(Vector("comparable")))
+    val low = Answer(Vector("s" -> "name(argmin(price, #v1, #v2))"), "{s}")
+    assertEquals(renderBy(low, byKind).left.map(_.map(_.code)), Left(Vector("comparable")))
+    // one shop's: the combo against its own slot
+    val within = Answer(Vector("c" -> "price(#s1) <= price(#v1)"), "{c, select, true {tak} other {nie}}")
+    assert(renderBy(within, byKind).isRight, renderBy(within, byKind).toString)
+    // a single value is no comparison
+    assert(renderBy(Answer(Vector("p" -> "price(#v2)"), "{p}"), byKind).isRight)

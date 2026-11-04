@@ -61,8 +61,32 @@ object Resolve:
       case None => Eval.each(exprs.collect { case (n, Right(x)) => n -> x })((n, x) => Eval(x, handles).flatMap {
           case Left(why) => pure(Left(Violation(if boolType(x, handles, schema) == Type.Bool then "claim"
             else "value", s"$n = ${Expr.show(x)}: $why")))
-          case Right(c) => chip(n, x, c, handles, l).map(ch => Right(n -> (c, ch)))
+          case Right(c) => comparable[R](n, x, c, schema).flatMap {
+              case Some(v) => pure(Left(v))
+              case None => chip(n, x, c, handles, l).map(ch => Right(n -> (c, ch)))
+            }
         }).map(_.map(_.toMap))
+
+  /** COMPARISONS ONLY OF COMPARABLE THINGS (§17 "Round 4"): a comparison or an extreme (`<`, `>`, `min`, `argmin`…)
+   * over a property that says what it is comparable by (`Prop.comparableBy`), of entities of different sources —
+   * every one of them must have that property alike, else the violation `comparable`. Within one source, any */
+  def comparable[R[_]](n: String, x: Expr, c: Computed, schema: Schema)(using In[Facts, R]): Option[Violation] ! R =
+    def compares(e: Expr): Boolean = e match
+      case Expr.Bin(op, l, r) => Set("<", "<=", ">", ">=")(op) || compares(l) || compares(r)
+      case Expr.Call(fn, args) => Set("min", "max", "argmin", "argmax")(fn) || args.exists(compares)
+      case Expr.Not(y) => compares(y)
+      case Expr.As(y, _) => compares(y)
+      case _ => false
+    val byWhat = c.facts.flatMap(f => schema.prop(f.ent.cls, f.prop).map(_.comparableBy).filter(_.nonEmpty)
+      .map(k => f.ent -> k)).distinct
+    if !compares(x) || byWhat.map(_._1.source).distinct.size < 2 then pure(None)
+    else Eval.each(byWhat)((e, k) => Facts.get[R](e, k).map(v => Right[String, Option[Value]](v.map(_.value))))
+      .map {
+        case Right(kinds) if kinds.forall(_.isDefined) && kinds.flatten.forall(Value.same(_, kinds.flatten.head)) =>
+          None
+        case _ => Some(Violation("comparable", s"$n = ${Expr.show(x)}: values of different kinds of thing across " +
+          s"sources ('${byWhat.map(_._2).distinct.mkString(", ")}' not alike): compare only things of one kind"))
+      }
 
   /** the template formatted with the values: none when it does not parse or names a value not there */
   def format(a: Answer, byName: Map[String, (Computed, Chip)], l: Lang): Option[Rendered] =

@@ -2,9 +2,10 @@ package okay.facts
 
 /** A PROPERTY of a class: its type (a value's, or a link's `Type.Entity`), whether the model may see it (`visible`:
  * names, a category, a city — never a price, a time, a stock), whether it yields one value (`functional`: a path
- * through it is exact) */
+ * through it is exact), what makes two entities' values comparable across sources (`comparableBy`: a property both
+ * must have alike — a service's `price` by its `kind`; §17 "Round 4") */
 final case class Prop(name: String, tpe: Type, visible: Boolean = false, functional: Boolean = true,
-                      about: String = "")
+                      about: String = "", comparableBy: String = "")
 
 /** A CLASS of the metamodel (specs/design.md §4): its name, its parents, its properties, the prefix of its handles
  * (`v` → `#v1`), its key (identity), the vocabulary term it comes from (`https://schema.org/Service`), whether its
