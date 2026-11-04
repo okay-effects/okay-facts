@@ -74,7 +74,9 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   3. okay-mall: the answers taken (no model), counters per category in the shop's chat counts and the home's, the
   dashboard's chat column, a strike count per conversation (3 injections or others' data → 10 minutes of the fixed
   answer); tests; deploy; verify-apex 27/27; screenshots.
-- [ ] **router lane, round 4** (operator 2026-11-04, after the guard answers; §17 "Round 4"). Plan (spec first;
+- [x] **router lane, round 4** (operator 2026-11-04, after the guard answers; §17 "Round 4"; done 2026-11-04: released
+  okay-facts and okay-shop 0.1.0, okay-mall deployed, verify-apex 27/27; the held-out run: 83.9% at 88.9%, the 97% not
+  met; §14.6, §16). Plan (spec first;
   releases under 0.1.0; okay-mall deployed; verify-apex 27/27):
   0. A NEW held-out set (≥250 turns, an independent author who saw only the demo shops' data) written and FROZEN
      (sha256) in okay-mall measure/2026-11-04-r4/ before any tuning; run once.

@@ -478,6 +478,27 @@ the demo shops' data (pl 128, uk 64, ru 64, en 64; 51 for the model, 20 injectio
 - **A first message**: the page warmed when idle and a message with no open p50 0.42 s (p95 0.62 s); after the chat's
   open p50 0.52 s (0.74 s before); a cold object with no warming at all 1.58 s (was 1.70 s).
 
+**Round 4, 2026-11-04** (§17 "Round 4", §16 "The guard answers", "The router lane, round 4"; okay-mall
+`measure/2026-11-04-r4/report.md`): a NEW held-out set, 311 turns by an independent author who saw only the demo
+shops' data (pl 130, uk 59, ru 60, en 62; 47 for the model, 16 injections; 70 on the mall's home; 36 follow-ups),
+frozen before any tuning (sha256 `4d95a1bf…2e32`), run once, the `auto` lane only. The guard now answers its turns
+with fixed answers (no model): a guard's answer to a turn meant for the model counts as right, to any other as wrong.
+
+| set | lane | answered by the router | router precision | slots | model share | wrong facts | tokens a turn | cost a turn | latency p50 / p95 |
+|---|---|---|---|---|---|---|---|---|---|
+| round 3 (320) | auto | 246 (76.9%) | 91.9% | 88.7% | 23.1% | 0 | 1 090 | $0.00043 | 60 ms / 8.9 s |
+| round 4 (311) | auto | 261 (83.9%) | **88.9%** | 69.2% | 15.1% | 0 | 1 005 | $0.00038 | 32 ms / 9.5 s |
+
+- **The router**: 261 answered (3 more asked back between two intents), 232 right — the 97% NOT met, and lower than
+  round 3 on a fresh author's text; coverage up 7 points, the model's share down to 15%. Its 29 wrong: 3 the guard's
+  false refusals (narrowed after the run), 5 meant for the model (advice in a service's words), 6 hours or a master's
+  day vs free times, 4 places in Latin letters or a follow-up naming only a place, 3 comparisons, 8 other near pairs.
+  Slots 69.2% (a place's label the author's own name of it, the router the area's entry: 15 of the 53). On the
+  train/dev sets after round 4 (r3 now dev): 99.0–100% at 90.9–97.8%.
+- **The guard** on this set: 39 fixed answers — 36 of the 47 turns meant for the model, **3 false refusals** (reviews'
+  "warto?", "paczkomat code", "адрес мастерской"); 0 on every set after narrowing.
+- **Wrong facts: 0**; the expected values shown in 254 of 311. In the router's own time p50 28 ms, p95 59 ms.
+
 ## 15. Gotchas
 
 - Non-unique links make paths wrong silently (an averaged value belonging to nobody): enforce functionality.
@@ -630,6 +651,31 @@ the demo shops' data (pl 128, uk 64, ru 64, en 64; 51 for the model, 20 injectio
   jutro" in four languages — manage —, "ile płacę za …" three times — price —, "czy jest parking przy was?" —
   address). The one left is the last, now an amenity's answer that gives the address. Turns meant for the model
   the guard takes: 87 of 118 → 104 of 118 (the rest go to the combiner, its `other` to the model lane).
+
+### The router lane, round 4 (operator 2026-11-04; §14.6, §17 "Round 4")
+
+- **The confusion over train/dev** (the 2026-11-03 sets, 2026-11-04, round 3 — all dev now), by pair: free times vs a
+  booking (4), the contact vs the address (2), the area vs the ways of working with a place (3), the hours vs free
+  times / masters / a price / a search (4, two of them a shop named on the mall's home), a comparison vs a price (2),
+  a master vs a price (1). Settled by evidence (okay-shop `settle`): a place of the gazetteer → the area; a booking only
+  with its word or an exact time; a contact's words over the address; the hours' words over free times with no
+  service; "only the X", short, a price. Asked back (`clarify`): the combiner's top two of a confusable pair under 0.8
+  within 0.3 (the wrong ones' margins: 0.17–0.49; a tenth of all decisions are under 0.41). Dev after: round 3 99.0% at
+  90.9% (2 asked back), 2026-11-04 100% at 92.1%, 2026-11-03 99.5% at 97.8% — tuned there, so a hypothesis.
+- **The gazetteer**: 403 places (217 cities over 20 000 by GUS 2021, 186 districts of the 10 largest cities and the
+  demo shops' own), 3 032 folded forms, 109 KB; generated forms are rules, not a dictionary (Polish genitive and
+  locative, Ukrainian and Russian transliteration and cases, -ів's alternation; exonyms for 25 cities, a
+  transliteration of "Łódź" would read "ludzi"); one edit only at 7 letters ("sobote" is one edit from "sopote");
+  a common word's place ("Rury", "Przeróbka", "Centrum") only capitalised.
+- **Comparable services**: `Prop.comparableBy`; okay-shop's `kind` from okay-mall's catalogue (the niche's template
+  with three quarters of its words). The demo shops are of six niches, so no two shops' services compare: "cheaper
+  elsewhere" says there is no such service elsewhere. The §12 flow's cross-shop comparison (a manicure against a
+  men's haircut) is now refused (`comparable`) and the model answers again without it.
+- **When**: a bare "12:00" after "до"/"do"/"until" is the limit, not the time asked (it made "є час до 12:00" a booking).
+- **Open** (round 5, BACKLOG): the 97% on fresh text (88.9%); places typed in Latin letters for Cyrillic ("v Sopote",
+  "a do Varshavy?") when the combiner says a price; a shop named with a typo ("Barber Dmeo") or in Cyrillic
+  transliteration of a Polish name ("пральня бяла"); the hours asked as "графік?", "по вторникам работаете?";
+  advice in a service's words (an eco detergent, sneakers of a brand); slots' place labels.
 
 ### Implementation notes (2026-11-03)
 

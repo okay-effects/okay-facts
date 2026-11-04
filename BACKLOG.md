@@ -26,3 +26,8 @@ Found while building (2026-11-03):
   ("заплатити", "w domu" for a stain), a named shop on the mall's home asking its hours, free times vs a booking, a
   comparison's relevance (an unrelated cheaper service: an exact value of a wrong reference); then a new held-out set
   (round 3's is spent).
+- **The router lane, round 5** (§14.6 round 4: 88.9% right at 83.9% answered on a fresh held-out set, the target 97%):
+  places typed in Latin letters for Cyrillic decided as the area when the combiner says a price; a shop named with a
+  typo or in a Cyrillic transliteration of its Polish name on the mall's home; the hours in short words ("графік?",
+  "по вторникам работаете?"); advice in a service's words; the place slot's label; then a new held-out set (round 4's
+  is spent).
