@@ -90,7 +90,8 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
      close ones asked back (`clarify` with suggestions; the widget's buttons); tests; release.
   3. okay-mall: the kinds from the catalogue; the gazetteer in the search and the geocoder; the mall's contact as a
      fact; the measurement (auto) on the new set beside the old rows, the guard's false positives on it; deploy.
-- [ ] **the guard independent of the router** (operator 2026-11-05; §17 "The turn decision" step 1) — today the guard
+- [x] **the guard independent of the router** (operator 2026-11-05; §17 "The turn decision" step 1; done 2026-11-05:
+  released okay-facts and okay-shop 0.1.0, okay-mall deployed, verify-apex 27/27, production checked) — today the guard
   runs only inside the router: `CHAT_ROUTER=off` or a table that failed to load sends guarded turns to the model. Plan:
   1. okay-facts: `Guard` (the patterns alone, no table), the router holding it; `Table.empty`; tests; release 0.1.0.
   2. okay-shop: `ShopRouter.guardTurn` (no table: the answers' services by words), `guardReady` (the data whole),
