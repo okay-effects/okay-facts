@@ -454,6 +454,30 @@ none. The rows of 2026-11-03 above are kept for comparison (another set: 180 tur
   (the chat's open warms the conversation's object; the table read in place); a message with no open first 1.70 s; the
   table's loading CPU in a fresh isolate 102–139 ms (was ≈ 0.4–0.6 s).
 
+**Round 3, 2026-11-04** (§16 "The router lane, round 3", §17 "The turn decision"; okay-mall
+`measure/2026-11-04-r3/report.md`): a NEW held-out set, 320 turns written fresh by an independent author who saw only
+the demo shops' data (pl 128, uk 64, ru 64, en 64; 51 for the model, 20 injections in four languages; 33 follow-ups;
+48 on the mall's home), frozen before any tuning (sha256 `b0998bac…7397`), run once, paced; the fallback `glm-5.3`.
+
+| set | lane | answered by the router | router precision | slots | model share | wrong facts | tokens a turn | cost a turn | latency p50 / p95 |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-03 (180) | auto | 154 (86%) | 89% | 80% | 14% | 0 | 820 | $0.00031 | 12 ms / 12.3 s |
+| 2026-11-04 (340) | auto | 270 (79.4%) | 86.7% | 95.6% | 20.6% | 0 | 1 117 | $0.00043 | 23 ms / 7.8 s |
+| round 3 (320) | auto | 246 (76.9%) | **91.9%** | 88.7% | 23.1% | 0 | 1 090 | $0.00043 | 60 ms / 8.9 s |
+| round 3 (320) | model lane alone | — | — | — | 100% | 0 | 5 819 | $0.00217 | 5.8 s / 24.5 s |
+| round 3 (320) | usual (data in the prompt) | — | — | — | 100% | 0 (7 flagged, none wrong) | 4 586 | $0.00154 | 2.6 s / 6.2 s |
+
+- **The router**: precision 91.9% (86.7% before) — the 97% still NOT met; the combiner's out-of-fold 97.1% at 84.4%
+  coverage on train/dev did not carry over whole. Its 20 wrong: 5 meant for the model (advice naming a service, a
+  stain washed at home, paying on delivery in words the guard lacks, a dog), 4 on the mall's home (a named shop's
+  hours, the mall's own contact), 3 at the client's vs a place written in Cyrillic, 8 near intents (free times vs a
+  booking, a date's hours, a phone vs the address). In its own time p50 37 ms, p95 288 ms (the prefetch's call
+  included); the model behind it p50 5.9 s.
+- **Wrong facts: 0 in every lane.** One router answer compared a suit's cleaning with unrelated cheaper services of
+  other shops — every value exact, the reference irrelevant: the honest boundary of §2, now an open item.
+- **A first message**: the page warmed when idle and a message with no open p50 0.42 s (p95 0.62 s); after the chat's
+  open p50 0.52 s (0.74 s before); a cold object with no warming at all 1.58 s (was 1.70 s).
+
 ## 15. Gotchas
 
 - Non-unique links make paths wrong silently (an averaged value belonging to nobody): enforce functionality.
@@ -566,7 +590,29 @@ none. The rows of 2026-11-03 above are kept for comparison (another set: 180 tur
   intents' examples (the probe), the 180 + 45 turns of 2026-11-03 and the 340 of 2026-11-04 (spent as a held-out set:
   from now on train/dev only, as the 180 became in round 2); the new held-out set of round 3 (okay-mall
   `measure/2026-11-04-r3/`) frozen before any tuning and run once.
-- **Reads in one call** (`Facts.Prefetch`, a hint a handler may ignore); **the probe and the combiner binary** (`Weights`).
+- **Reads in one call** (`Facts.Prefetch`, a hint a handler may ignore); **the probe and the combiner binary**
+  (`Weights`).
+- **The combiner, calibrated** (okay-mall `Fit`, `measure/2026-11-04-r3/curve.md`): 64 inputs (16 intents × probe,
+  rules, previous intent, and 16 of the host's evidence), L2 1e-4, temperature 0.8, out of fold (5 folds) over the 565
+  train/dev turns; the guard took 44 of them (all meant for the model), the safe rules 18 (all right). Out of fold:
+  threshold 0.30 — 86.7% answered at 95.5%; 0.50 — 85.0% at 96.7%; **0.53 — 84.4% at 97.1% (chosen)**; 0.60 — 82.8% at
+  97.6%; 0.70 — 81.2% at 98.5%; 0.80 — 78.4% at 98.6%; 0.90 — 74.9% at 99.3%. On the new held-out set: 76.9% at 91.9%
+  (§14.6).
+- **Fixes**: at the client's is the ways of working (the area's examples and rules moved; with a place named, the
+  area); a laundry's pickup a booking ("zamów odbiór"); the mall's home: a shop named by its name answers its own facts,
+  a price of a service one shop has its price — asked before the conversation's last service; `When`: a month only as
+  its word next to a day's number; cancel's stems (скасуйте, анулюйте, odwołajcie, отмените); "only the haircut" the
+  plain name; the guard in four languages (ignore or forget instructions, the system prompt, "you are now", role-play,
+  a price set by the user, discounts, others' data, payments, advice and health, out of domain).
+- **Speed**: a turn's reads of a shop in one call (`Facts.Prefetch`, the mall's handler keeps a turn's answers: a price
+  turn 10 → 1 call), the guards together, the tokens and the audit after the answer, the probe binary (JVM warm 2.37 →
+  0.095 ms); a first message after the page's idle warming p50 0.42 s (§14.6).
+- **The fallback `glm-5.3`, verified on production** (2026-11-04): the operator's `POST /_admin/api/chat/try` with
+  `force: fallback` (the default asked as `@cf/okay/forced-failure`, a model no platform has) on barber-demo — the
+  fallback answered (a model-lane answer rendered by the resolver: "Na wesele polecam Strzyżenie + broda — komplet.
+  Koszt: 110,00 zł, …"); a client's request never forces it (its header stripped, `ChatSuite`).
+- **Open** (round 4): the 97% on fresh text; a Cyrillic place's evidence; advice and payments in more words; a
+  comparison's relevance (an unrelated cheaper service is an exact value of a wrong reference).
 
 ### Implementation notes (2026-11-03)
 

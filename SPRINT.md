@@ -43,7 +43,9 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   6. TCK again (deepseek-v4.1-flash-1017, gpt-oss-120b, newer tool+JSON models), passports in §16.
   7. Releases (okay-facts, okay-shop; okay-serverless if touched) under 0.1.0, okay-mall deployed, verify-apex 27/27;
      the measurement on the held-out set (auto / model / usual), §14.6 a new dated row beside the old.
-- [ ] **router lane, round 3 + the fallback model** (operator 2026-11-04; BACKLOG "round 3", "The fallback model").
+- [x] **router lane, round 3 + the fallback model** (operator 2026-11-04; done 2026-11-04: released okay-facts and
+  okay-shop 0.1.0; okay-mall deployed; §14.6 round 3's rows — the router 76.9% at 91.9%, the 97%
+  not met; §16 the curve, the fixes, the fallback verified; round 4 in BACKLOG).
   Plan (spec first; tests; releases under 0.1.0; okay-mall deployed; verify-apex 27/27):
   1. A NEW held-out set (≥300 turns, an independent author, another style; ≥15% for the model, injections in 4
      languages, typos, Latin letters, follow-ups) written and FROZEN (sha256) in okay-mall measure/2026-11-04-r3/
@@ -60,3 +62,5 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   5. The fallback model `glm-5.3` (§16, okay-mall's runbook), verified once on production by an admin-only forced
      fallback.
   6. The measurement on the new set, run once: auto / model / usual beside 2026-11-03 and 2026-11-04 (§14.6).
+- [x] **distance and near** (operator 2026-11-04: okay-mall's geolocation, distance and maps) — `distance(#a, #b)`,
+  `Value.Point`, `Value.Meters`, the router's `Near` slot (§6, §17); released with okay-mall's maps.
