@@ -111,9 +111,13 @@ object When:
         if Zone.weekday(today0) == 7 then today0 else Zone.plus(today0, Math.floorMod(6 - Zone.weekday(today0), 7))))
     val part = if morning.test(t) then Some("morning") else if afternoon.test(t) then Some("afternoon")
       else if evening.test(t) then Some("evening") else None
-    val at = first(atTime, t).orElse(bare.all(t).headOption.flatMap((_, _, g) => minutes(g(0), g(1), "")))
-    val from = first(fromTime, t).orElse(part.collect { case "afternoon" => 12 * 60; case "evening" => 17 * 60 })
-    val until = first(untilTime, t).orElse(part.collect { case "morning" => 12 * 60; case "afternoon" => 17 * 60 })
+    val saidFrom = first(fromTime, t)
+    val saidUntil = first(untilTime, t)
+    // a bare "12:00" is the time asked only when no "after" or "until" took it ("до 12:00" is until noon)
+    val at = first(atTime, t).orElse(if saidFrom.isDefined || saidUntil.isDefined then None
+      else bare.all(t).headOption.flatMap((_, _, g) => minutes(g(0), g(1), "")))
+    val from = saidFrom.orElse(part.collect { case "afternoon" => 12 * 60; case "evening" => 17 * 60 })
+    val until = saidUntil.orElse(part.collect { case "morning" => 12 * 60; case "afternoon" => 17 * 60 })
     When(day, if at.isDefined then None else from, if at.isDefined then None else until, at,
       part.orElse(if t.contains("tonight") then Some("evening") else None))
 

@@ -161,6 +161,10 @@ class RouterSuite extends munit.FunSuite:
     assertEquals(day("12 мая"), Some("2027-05-12"))
 
   test("times: exact, from, until; parts of the day; a price is never a time"):
+    // a bare clock time after "до" / "do" / "until" is the limit, not the time asked (round 4)
+    assertEquals(When.of("у вівторок до 12:00 є час?", "2026-11-04").until, Some(720))
+    assertEquals(When.of("у вівторок до 12:00 є час?", "2026-11-04").at, None)
+    assertEquals(When.of("jutro 13:00", "2026-11-04").at, Some(780))
     def w(t: String) = When.of(t, today)
     assertEquals(w("jutro o 17").at, Some(17 * 60))
     assertEquals(w("na 10:30").at, Some(10 * 60 + 30))
