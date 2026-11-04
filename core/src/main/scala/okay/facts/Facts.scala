@@ -66,12 +66,18 @@ enum Facts[X]:
   case Find(query: Query) extends Facts[Vector[Found]]
   case Get(ent: Ent, prop: String) extends Facts[Option[Fact]]
   case Act(name: String, args: Map[String, Value], lang: Lang) extends Facts[Either[String, Acted]]
+  /** A HINT (specs/design.md §17 "Reads in one call"): these finds — with the named properties of each entity found —
+   * and these properties will be asked this turn. A handler with a cache reads them at once (over the wire: one call)
+   * and answers the later `Find`s and `Get`s from it; one with no cache ignores it: it never changes an answer */
+  case Prefetch(finds: Vector[(Query, Vector[String])], gets: Vector[(Ent, String)]) extends Facts[Unit]
 
 object Facts:
   def find[R[_]](q: Query)(using In[Facts, R]): Vector[Found] ! R = perform[Facts](Find(q))
   def get[R[_]](ent: Ent, prop: String)(using In[Facts, R]): Option[Fact] ! R = perform[Facts](Get(ent, prop))
   def act[R[_]](name: String, args: Map[String, Value], lang: Lang)(using In[Facts, R])
     : Either[String, Acted] ! R = perform[Facts](Act(name, args, lang))
+  def prefetch[R[_]](finds: Vector[(Query, Vector[String])], gets: Vector[(Ent, String)] = Vector.empty)(using
+    In[Facts, R]): Unit ! R = perform[Facts](Prefetch(finds, gets))
 
   /** the facts of rows in memory: `Table`'s find and get; no actions */
   def table[R[_], Rest[_], A](schema: Schema, rows: () => Vector[Row])(p: A ! R)(using Split[Facts, R, Rest])
@@ -79,6 +85,7 @@ object Facts:
     handle(p, Handler.tail[Facts, Rest, A, A](pure)([X] => (op: Facts[X]) => op match
       case Find(q) => Table.find(schema, rows(), q)
       case Get(ent, prop) => Table.get(rows(), ent, prop)
+      case Prefetch(_, _) => ()
       case Act(name, _, _) => Left(s"no action $name here")))
 
 /** AN ENTITY'S ROW: its values by property, its version, when it changed */

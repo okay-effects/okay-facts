@@ -258,6 +258,22 @@ class WireSuite extends Ground:
       val direct = facts(perform[Facts](op.asInstanceOf[Facts[Any]]))
       assertEquals(Wire.answer(op.asInstanceOf[Facts[Any]], Right(served)), direct)
 
+  test("a prefetch over the wire: one call answers its finds, each found's properties and its gets, as asked alone"):
+    val q = Query("Service", scope = Scope.Source("barber-demo"), limit = 20)
+    val combo = Demo.service("barber-demo", "combo")
+    val op: Facts.Prefetch = Facts.Prefetch(Vector(q -> Vector("price", "duration", "nothing")), Vector(combo -> "name",
+      combo -> "nothing"))
+    val served = facts(Wire.serve[F](okay.effects.json.Json.fromText(Wire.request(op).render)))
+    val Some((Vector((found, props)), gets)) = Wire.fetched(op, Right(served)): @unchecked
+    assertEquals(found, facts(Facts.find[F](q)))
+    val asked = found.map(f => Vector("price", "duration", "nothing").map(p => p -> facts(Facts.get[F](f.ent, p)))
+      .toMap)
+    assertEquals(props, asked)
+    assert(props.exists(_("price").isDefined) && props.forall(_("nothing").isEmpty))
+    assertEquals(gets, Vector(facts(Facts.get[F](combo, "name")), None))
+    // a handler with no cache ignores the hint
+    assertEquals(facts(Facts.prefetch[F](op.finds, op.gets)), ())
+
 class ChipSuite extends Ground:
   test("a value computed of several entities: the chip names them all"):
     val r = render(Answer(Vector("c" -> "price(#v1) < price(#v2)"), "{c, select, true {Taniej.} other {Drożej.}}"))

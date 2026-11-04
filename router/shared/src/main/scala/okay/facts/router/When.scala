@@ -41,16 +41,27 @@ object When:
       "nedil\\w*"))
     .map((d, p) => d -> r(s"\\b(?:$p)\\b"))
 
-  private val months: Vector[String] = Vector(
-    "stycz\\w*|січ\\w*|январ\\w*|jan\\w*", "lut\\w*|лют\\w*|феврал\\w*|feb\\w*", "mar\\w*|берез\\w*|март\\w*",
-    "kwie\\w*|квіт\\w*|апрел\\w*|apr\\w*", "maj\\w*|трав\\w*|ма[яи]|may", "czerw\\w*|черв\\w*|июн\\w*|jun\\w*",
-    "lip\\w*|лип\\w*|июл\\w*|jul\\w*", "sierp\\w*|серп\\w*|август\\w*|aug\\w*",
-    "wrze\\w*|верес\\w*|сентябр\\w*|sep\\w*",
-    "pazdz\\w*|жовт\\w*|октябр\\w*|oct\\w*", "listopad\\w*|листопад\\w*|ноябр\\w*|nov\\w*",
-    "grud\\w*|груд\\w*|декабр\\w*|dec\\w*")
-  private val dayMonth = months.zipWithIndex.map((p, i) => (i + 1) -> r(s"\\b([0-3]?\\d)(?:st|nd|rd|th|go|ego)?\\s+" +
-    s"(?:of\\s+)?(?:$p)\\b"))
-  private val monthDay = months.zipWithIndex.map((p, i) => (i + 1) -> r(s"\\b(?:$p)\\s+([0-3]?\\d)(?:st|nd|rd|th)?\\b"))
+  // a month as its own word (lower case, diacritics off — `й` is `и`), never a stem: "marek's", "u Marka", "majster"
+  // are no month. The Slavic forms (and their Latin spellings) after a day's number; the English ones either side
+  private val slavic: Vector[String] = Vector(
+    "stycznia|styczen|styczniu|січня|січень|січні|января|январь|январе|yanvarya|sichnya",
+    "lutego|luty|lutym|лютого|лютии|лютому|февраля|февраль|феврале|fevralya|lyutogo",
+    "marca|marzec|marcu|березня|березень|березні|марта|март|марте|marta|bereznya",
+    "kwietnia|kwiecien|kwietniu|квітня|квітень|квітні|апреля|апрель|апреле|aprelya|kvitnya",
+    "maja|maj|maju|травня|травень|травні|мая|маи|мае|maya|travnya",
+    "czerwca|czerwiec|czerwcu|червня|червень|червні|июня|июнь|июне|iyunya|chervnya",
+    "lipca|lipiec|lipcu|липня|липень|липні|июля|июль|июле|iyulya|lypnya",
+    "sierpnia|sierpien|sierpniu|серпня|серпень|серпні|августа|август|августе|avgusta|serpnya",
+    "wrzesnia|wrzesien|wrzesniu|вересня|вересень|вересні|сентября|сентябрь|сентябре|sentyabrya|veresnya",
+    "pazdziernika|pazdziernik|pazdzierniku|жовтня|жовтень|жовтні|октября|октябрь|октябре|oktyabrya|zhovtnya",
+    "listopada|listopad|listopadzie|листопада|листопад|листопаді|ноября|ноябрь|ноябре|noyabrya|lystopada",
+    "grudnia|grudzien|grudniu|грудня|грудень|грудні|декабря|декабрь|декабре|dekabrya|grudnya")
+  private val english: Vector[String] = Vector("january|jan", "february|feb", "march|mar", "april|apr", "may",
+    "june|jun", "july|jul", "august|aug", "september|sept|sep", "october|oct", "november|nov", "december|dec")
+  private val dayMonth = slavic.zip(english).zipWithIndex.map { case ((s, e), i) => (i + 1) ->
+    r(s"\\b([0-3]?\\d)(?:st|nd|rd|th|go|ego|-?го|-?ого)?\\s+(?:of\\s+)?(?:$s|$e)\\b") }
+  private val monthDay = english.zipWithIndex.map((p, i) => (i + 1) ->
+    r(s"\\b(?:$p)\\.?\\s+([0-3]?\\d)(?:st|nd|rd|th)?\\b(?![:.]\\d)"))
   private val numeric = r("\\b([0-3]?\\d)[./]([01]?\\d)\\b(?![.:/]\\d)")
 
   private val morning = r("\\b(?:rano|rana|z rana|przed poludniem|przedpoludniem|morning|зранку|вранці|ранку|" +

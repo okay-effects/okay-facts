@@ -561,7 +561,7 @@ none. The rows of 2026-11-03 above are kept for comparison (another set: 180 tur
   intents' examples (the probe), the 180 + 45 turns of 2026-11-03 and the 340 of 2026-11-04 (spent as a held-out set:
   from now on train/dev only, as the 180 became in round 2); the new held-out set of round 3 (okay-mall
   `measure/2026-11-04-r3/`) frozen before any tuning and run once.
-- **Reads in one call** (`Facts.Many`, `Facts.Expand`); **the probe and the combiner binary** (`Weights`).
+- **Reads in one call** (`Facts.Prefetch`, a hint a handler may ignore); **the probe and the combiner binary** (`Weights`).
 
 ### Implementation notes (2026-11-03)
 
@@ -743,9 +743,10 @@ the intent needs → the model lane. The host logs per turn the lane, the intent
 decided (`guard`, `safe`, `combined`, `unknown`) — never the message's words. A host can force a lane (tests, the
 measurement).
 
-**Reads in one call.** A turn's reads of a shop's facts are batched (core: `Facts.Many` — several operations in one
-round trip; `Facts.Expand` — a find and the named properties of each entity found, answered where the data is): the
-router asks, in one call, everything a turn of a shop may need (its services in every language with their prices,
+**Reads in one call.** A turn's reads of a shop's facts are batched (core: `Facts.Prefetch(finds, gets)` — a hint:
+these finds, with the named properties of each entity found, and these properties will be asked; a handler with no
+cache ignores it, so it never changes an answer; over the wire one call, answered where the data is): the router asks,
+in one call, everything a turn of a shop may need (its services in every language with their prices,
 durations and whether bookable; its masters with their names; its places; the shop's own properties). The host's
 handler keeps a turn's answers (a turn is a snapshot: an action forgets them), so the later reads and the
 renderer's are answered from them.

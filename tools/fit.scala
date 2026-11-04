@@ -9,6 +9,8 @@
 //> using file ../router/shared/src/main/scala/okay/facts/router/Probe.scala
 //> using file ../router/shared/src/main/scala/okay/facts/router/Router.scala
 //> using file ../router/shared/src/main/scala/okay/facts/router/Rules.scala
+//> using file ../router/shared/src/main/scala/okay/facts/router/Weights.scala
+//> using file ../router/shared/src/main/scala/okay/facts/router/Combiner.scala
 //> using file ../router/jvm/src/main/scala/okay/facts/router/Re.scala
 
 /**
@@ -17,7 +19,7 @@
  * first, as the router does); the share right, and, at each threshold, what the router would answer (confident, not
  * `other`) and how much of it is right. Then the probe on
  * every example, written.
- *   scala-cli run tools/fit.scala -- <intents.json> <table.safetensors> <out probe.json>
+ *   scala-cli run tools/fit.scala -- <intents.json> <table.safetensors> <out probe.bin>
  */
 import okay.effects.json.Json
 import okay.facts.router.{Intent, Intents, Probe, Route, Router, Table}
@@ -48,5 +50,7 @@ import java.nio.file.{Files, Paths}
   routed.filter((i, r, _) => r.intent != i).foreach((i, r, l) => println(s"  wrong: $l $i → ${r.intent} (${r.by}, " +
     f"${r.p}%.2f)"))
   val probe = Router.fit(table, intents)
-  Files.writeString(Paths.get(out), Json.print(Probe.toJson(probe)))
+  // the weights as bytes (`Weights`, round 3); a `.json` name the JSON of round 2
+  if out.endsWith(".json") then Files.writeString(Paths.get(out), Json.print(Probe.toJson(probe)))
+  else Files.write(Paths.get(out), Probe.toBytes(probe))
   println(s"written $out: ${probe.classes.size} classes × ${probe.w.head.length}")

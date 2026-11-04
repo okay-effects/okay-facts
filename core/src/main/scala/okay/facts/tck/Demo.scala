@@ -148,6 +148,7 @@ object Demo:
             case Scope.Source(id) => Some(id)
           Table.find(schema, rows.filter(r => in.forall(_ == r.ent.source)), q)
         case Facts.Get(ent, prop) => Table.get(rows, ent, prop)
+        case Facts.Prefetch(_, _) => ()
         case Facts.Act(name, args, _) => name match
           case "open" => args.get("shop") match
             case Some(Value.Entity(e)) => Table.get(rows, e, "url").map(f => Acted(Some(e), Map("url" -> f),

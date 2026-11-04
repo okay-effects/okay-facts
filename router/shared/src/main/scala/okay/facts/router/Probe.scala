@@ -59,3 +59,11 @@ object Probe:
 
   def fromJson(j: Json): Probe = Probe(j("classes").list.map(_.string),
     j("w").list.map(_.list.map(_.double).toArray), j("b").list.map(_.double).toArray)
+
+  /** the weights as bytes (`Weights`): the file a host carries since round 3 */
+  def toBytes(p: Probe): Array[Byte] = Weights.write(Json.obj("kind" -> Json.str("probe"), "classes" ->
+    Json.Arr(p.classes.map(Json.str))), Vector("w" -> p.w, "b" -> Vector(p.b)))
+
+  def fromBytes(bytes: Array[Byte]): Probe =
+    val (h, a) = Weights.read(bytes)
+    Probe(h("classes").list.map(_.string), a("w"), a("b").head)
