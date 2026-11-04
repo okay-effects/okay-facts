@@ -42,7 +42,7 @@ object Noun:
 
 /** A VALUE'S TYPE (the metamodel's value types, specs/design.md §4) */
 enum Type:
-  case Money, Duration, Time, Date, Number, Text, Url, Bool
+  case Money, Duration, Time, Date, Number, Text, Url, Bool, Point, Distance
   case Count(noun: Noun)
   case Entity(cls: String)
   /** a set: what a non-functional path yields — only an aggregate takes it */
@@ -76,6 +76,10 @@ enum Value:
   case Bool(b: Boolean)
   case Entity(ent: Ent)
   case Many(values: Vector[Value])
+  /** a place on the Earth (WGS 84 degrees): a shop's point, a client's asked-of place — never shown to the model */
+  case Point(lat: Double, lon: Double)
+  /** a distance in metres, computed here (`distance(#a, #b)`), never the model's */
+  case Meters(m: Long)
 
 object Value:
   def text(s: String): Value = Text(Lang.values.map(_ -> s).toMap)
@@ -99,6 +103,8 @@ object Value:
     case Bool(_) => Type.Bool
     case Entity(e) => Type.Entity(e.cls)
     case Many(vs) => Type.Many(vs.headOption.map(typeOf).getOrElse(Type.Text))
+    case Point(_, _) => Type.Point
+    case Meters(_) => Type.Distance
 
   /** ORDER between two values of comparable kinds — money of one currency, durations, numbers and counts, times
    * (an instant against an instant, a day — its local date —, or a time of day), days; none: not comparable */
@@ -110,6 +116,10 @@ object Value:
     case (Minutes(x), Num(y)) => Some(BigDecimal(x).compare(y))
     case (Num(x), Minutes(y)) => Some(x.compare(BigDecimal(y)))
     case (Minutes(x), Minutes(y)) => Some(x.compareTo(y))
+    // a distance against a bare number: in kilometres (`distance(#v1, #here1) <= 3`)
+    case (Meters(x), Meters(y)) => Some(x.compareTo(y))
+    case (Meters(x), Num(y)) => Some(BigDecimal(x).compare(y * 1000))
+    case (Num(x), Meters(y)) => Some((x * 1000).compare(BigDecimal(y)))
     case (Num(x), Num(y)) => Some(x.compare(y))
     case (Count(x, _), Count(y, _)) => Some(x.compareTo(y))
     case (Count(x, _), Num(y)) => Some(BigDecimal(x).compare(y))
@@ -200,3 +210,15 @@ object Words:
       else if w.nonEmpty then { out += w.toString; w.clear() }
     if w.nonEmpty then out += w.toString
     out.result()
+
+/** DISTANCES ON THE EARTH (specs/design.md §6 `distance`): the great circle's, by the haversine formula, a sphere of
+ * the mean radius — metres, good to a few metres in a city */
+object Geo:
+  val radius = 6371008.8
+  def meters(a: Value.Point, b: Value.Point): Long =
+    def rad(d: Double) = d * math.Pi / 180
+    val dLat = rad(b.lat - a.lat)
+    val dLon = rad(b.lon - a.lon)
+    val h = math.pow(math.sin(dLat / 2), 2) + math.cos(rad(a.lat)) * math.cos(rad(b.lat)) * math.pow(
+      math.sin(dLon / 2), 2)
+    math.round(2 * radius * math.asin(math.min(1.0, math.sqrt(h))))

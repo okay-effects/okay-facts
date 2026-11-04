@@ -147,6 +147,11 @@ What the model writes inside `params`. Small, typed, evaluated only by the resol
 - **Comparisons and arithmetic**: `price(#v1) - price(#v7)`, `price(#v1) < price(#v7)` (a boolean renders as a phrase).
 - **Phrases**: derived facts rendered as whole localized phrases, e.g. `stockText(#v1, M)` → "w magazynie 3 szt." /
   "brak"; `available(#s1)`; so that factual claims in words ("in stock", "free tomorrow") also come from the resolver.
+- **Distance** (2026-11-04, okay-mall's maps): `distance(#shop1, #here1)` — two places, each an entity's `point`
+  (a property of type `Point`, hidden) or a handle's pinned point — the great circle's metres (`Value.Meters`,
+  haversine on the mean radius), rendered "850 m" (to 10 m), "1,2 km" (a decimal below 10 km), "12 km"; against a bare
+  number in kilometres (`distance(#shop1, #here1) <= 3`). A client's place enters only as a handle the host issued
+  with its point pinned (`#here1`), never a value of the model's.
 - **Formatting hints** (optional): `price(#v1) as short`.
 
 Type errors, unknown handles, non-functional paths → validation failure (§9).
@@ -657,14 +662,17 @@ every language, and the validator runs on the router's answers at runtime as on 
   "u Marka 5" are no March), a part of the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`, `до
   12`, `after 5pm`) in pl, uk, ru, en — Ukrainian and Russian typed in Latin letters too (`zavtra`, `v pyatnicu posle
   16`) —, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`, `under
-  150`, `max 150`, `deshevle 100`); `Nearest`: the candidates nearest a text (each unit of the text against each
-  candidate's name, in any of its languages): its words first — a name's word present in the text by its form (`near`:
-  the same, a start of 4 letters, a stem in common, one edit), in plain Latin (`Spell.fold`: "strizhka" is "стрижка"),
-  or by the host's `Lexicon` (groups of stems of one thing — "szafa", "meble", "wardrobe", "шкаф"; a verb's prefix
-  passed over: "po|czyścić"; a stem of 3 letters the whole word only; words that say nothing of which service it is
-  ignored: "drobna", "small", "telefon"), each word weighed by its rarity among the candidates (1 over how many have it)
-  —, its meaning beside them; a name with all its words wins by the text's words it accounts for ("haircut and beard" is
-  the haircut with a beard, not the beard); a threshold and a margin — two close: ambiguous, the host asks.
+  150`, `max 150`, `deshevle 100`); `Near` (2026-11-04): a place asked to be near — the speaker's own ("blisko mnie", "w
+  pobliżu", "поруч", "рядом", "near me") or one named ("w okolicy Mokotowa", "koło metra Centrum", "біля Оперного",
+  "около Центра", "near Centrum metro": its words as said, the host geocodes them); `Nearest`: the candidates nearest a
+  text (each unit of the text against each candidate's name, in any of its languages): its words first — a name's word
+  present in the text by its form (`near`: the same, a start of 4 letters, a stem in common, one edit), in plain Latin
+  (`Spell.fold`: "strizhka" is "стрижка"), or by the host's `Lexicon` (groups of stems of one thing — "szafa", "meble",
+  "wardrobe", "шкаф"; a verb's prefix passed over: "po|czyścić"; a stem of 3 letters the whole word only; words that say
+  nothing of which service it is ignored: "drobna", "small", "telefon"), each word weighed by its rarity among the
+  candidates (1 over how many have it) —, its meaning beside them; a name with all its words wins by the text's words it
+  accounts for ("haircut and beard" is the haircut with a beard, not the beard); a threshold and a margin — two close:
+  ambiguous, the host asks.
 - **The router** (`Router`, round 3): the guard's patterns, then the safe rules, then the combiner over the evidence
   (the probe's probabilities, every intent's rule hits, a follow-up's previous intent, the host's evidence) →
   `Route(intent, by: guard | safe | combined | unknown, p, margin)`; `confident` when safe, or the combiner's `p`

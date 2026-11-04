@@ -81,6 +81,12 @@ object Render:
     val s = n.bigDecimal.stripTrailingZeros.toPlainString
     if l == Lang.en then s else s.replace('.', ',')
 
+  /** a distance as people say it: "850 m" (to 10 m), "1,2 km" (a decimal below 10 km), "12 km" */
+  def distance(m: Long, l: Lang): String =
+    if m < 1000 then s"${math.max(10L, math.round(m / 10.0) * 10)} m"
+    else if m < 10000 then s"${number(BigDecimal(math.round(m / 100.0)) / 10, l)} km"
+    else s"${math.round(m / 1000.0)} km"
+
   def bool(b: Boolean, l: Lang): String = (b, l) match
     case (true, Lang.pl) => "tak"
     case (false, Lang.pl) => "nie"
@@ -112,6 +118,8 @@ object Render:
     case Value.Bool(b) => bool(b, l)
     case Value.Entity(e) => names(e)
     case Value.Many(vs) => vs.map(apply(_, l, hint, names)).mkString(", ")
+    case Value.Meters(m) => distance(m, l)
+    case Value.Point(a, o) => f"$a%.5f, $o%.5f".replace(',', '.')
 
   /** the integer an ICU plural selects by, when the value has one */
   def plural(v: Value): Option[BigDecimal] = v match

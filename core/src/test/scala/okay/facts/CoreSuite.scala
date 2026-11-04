@@ -287,3 +287,28 @@ class ClaimSuite extends Ground:
     assertEquals(codes(Answer(Vector("p" -> "price(#v1)"), "It costs {p}, cheaper than there.")), Vector("claim"))
     assertEquals(codes(Answer(Vector("c" -> "price(#v1) < price(#v2)"),
       "{c, select, true {Tak, taniej.} other {Nie, drożej.}}")), Vector.empty)
+
+class DistanceSuite extends Ground:
+  val warsaw = new Value.Point(52.2297, 21.0122)
+  val krakow = new Value.Point(50.0647, 19.9450)
+
+  test("a distance is computed here: the great circle's metres, rendered as people say it, compared in km"):
+    assert(math.abs(Geo.meters(warsaw, krakow) - 252000) < 2000, Geo.meters(warsaw, krakow))
+    assertEquals(Geo.meters(warsaw, warsaw), 0L)
+    assertEquals(Render(Value.Meters(1234), Lang.pl), "1,2 km")
+    assertEquals(Render(Value.Meters(1234), Lang.en), "1.2 km")
+    assertEquals(Render(Value.Meters(847), Lang.uk), "850 m")
+    assertEquals(Render(Value.Meters(12400), Lang.ru), "12 km")
+    assertEquals(Value.compare(Value.Meters(2500), Value.Num(3)), Some(-1))
+    assertEquals(Codec.valueOf(Codec.value(warsaw)), warsaw)
+    assertEquals(Codec.valueOf(Codec.value(Value.Meters(5))), Value.Meters(5))
+
+  test("distance(#a, #b) of two places' points (a handle's pinned one too), its sources both"):
+    val (h1, a) = Handles().issue("here", Ent("user", "Here", "here"), 0L, Vector.empty, Map("point" ->
+      Fact(warsaw, Ent("user", "Here", "here"), "point")))
+    val (h2, b) = h1.issue("here", Ent("user", "Here", "there"), 0L, Vector.empty, Map("point" ->
+      Fact(krakow, Ent("user", "Here", "there"), "point")))
+    val got = facts(Eval[F](Expr.parse(s"distance(${a.name}, ${b.name})").toOption.get, h2))
+    assert(got.exists(c => c.value match
+      case Value.Meters(m) => math.abs(m - 252000) < 2000 && c.facts.size == 2
+      case _ => false), got)

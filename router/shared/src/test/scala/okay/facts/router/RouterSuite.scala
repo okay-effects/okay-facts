@@ -224,3 +224,14 @@ class RouterSuite extends munit.FunSuite:
     // the rarer word counts more: "męskie" says which, "strzyżenie" every haircut has
     assertEquals(Nearest.lexical("strzyżenie męskie", "Strzyżenie męskie", weight = _ => 0.5), 1.0)
     assert(Nearest.lexical("męskie", "Strzyżenie męskie", weight = w => if w == "meskie" then 1 else 1.0 / 3) > 0.7)
+
+class NearSuite extends munit.FunSuite:
+  test("near: the speaker's own place, or one named, in four languages and in Latin letters"):
+    for t <- Seq("fryzjer blisko mnie", "manicure w pobliżu?", "барбер поруч", "мастер рядом", "barber near me",
+        "nail salon nearby", "poruch") do assertEquals(Near.of(t), Some(Near.Me), t)
+    assertEquals(Near.of("szewc w okolicy Mokotowa"), Some(Near.Named("Mokotowa")))
+    assertEquals(Near.of("fryzjer koło metra Centrum na jutro"), Some(Near.Named("metra Centrum")))
+    assertEquals(Near.of("манікюр біля Оперного театру?"), Some(Near.Named("Оперного театру")))
+    assertEquals(Near.of("стрижка около Центра, недорого"), Some(Near.Named("Центра")))
+    assertEquals(Near.of("haircut near Centrum metro tomorrow"), Some(Near.Named("Centrum metro")))
+    for t <- Seq("ile kosztuje strzyżenie?", "at 5 near 10", "around 5pm") do assertEquals(Near.of(t), None, t)

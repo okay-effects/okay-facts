@@ -28,6 +28,12 @@ object Eval:
         case Right(a) => apply(r, handles).map(_.flatMap(b => binary(op, a, b)))
       }
     case Expr.Call(fn, args) if Expr.aggregates(fn) => aggregate(fn, args, handles)
+    // the distance between two places: each an entity's `point` (or a point), the great circle's metres
+    case Expr.Call("distance", Vector(a, b)) => point(a, handles).flatMap {
+        case Left(e) => pure(Left(e))
+        case Right((p, fp)) => point(b, handles).map(_.map((q, fq) =>
+            Computed(Value.Meters(Geo.meters(p, q)), fp ++ fq)))
+      }
     case Expr.Call(fn, Vector(arg)) => apply(arg, handles).flatMap {
         case Left(e) => pure(Left(e))
         case Right(Computed(v, fs)) => property(fn, v, handles).map(_.map(c => Computed(c.value, fs ++ c.facts)))
@@ -46,6 +52,19 @@ object Eval:
           case Value.Many(inner) => inner
           case one => Vector(one))), cs.flatMap(_.facts))))
     case other => pure(Left(s"'$prop' of a value, not an entity"))
+
+  /** a place's point: a point as it is, an entity's `point` property */
+  private def point[R[_]](e: Expr, handles: Handles)(using In[Facts, R])
+    : Either[String, (Value.Point, Vector[Fact])] ! R =
+    apply(e, handles).flatMap {
+      case Left(x) => pure(Left(x))
+      case Right(Computed(p: Value.Point, fs)) => pure(Right((p, fs)))
+      case Right(Computed(v: Value.Entity, fs)) => property("point", v, handles).map(_.flatMap {
+          case Computed(p: Value.Point, more) => Right((p, fs ++ more))
+          case _ => Left("no point")
+        })
+      case Right(_) => pure(Left("distance takes two places"))
+    }
 
   /** `f` on each, in order; the first failure */
   def each[R[_], E, A, B](xs: Vector[A])(f: A => Either[E, B] ! R): Either[E, Vector[B]] ! R =

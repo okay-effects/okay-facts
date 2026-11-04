@@ -147,7 +147,8 @@ object Bind:
        |
        |EXPRESSIONS: property(handle) — price(#v1), time(#s1); paths — name(master(#s1)), city(shop(#v2));
        |comparisons give a boolean — price(#v1) < price(#v7), price(#v1) <= 150 PLN; differences —
-       |price(#v7) - price(#v1); aggregates — min, max, sum, avg, count, argmin(price, #v1, #v7); hints — time(#s1) as
+       |price(#v7) - price(#v1); aggregates — min, max, sum, avg, count, argmin(price, #v1, #v7); a distance —
+       |distance(#shop1, #here1) (in km against a number: distance(#shop1, #here1) <= 3); hints — time(#s1) as
        |datetime, price(#v1) as short. Never a value of your own except as a comparison's operand.
        |
        |TEMPLATE: an ICU message. {p} for a parameter; never a unit after a money or duration (it renders with its

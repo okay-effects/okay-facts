@@ -191,6 +191,13 @@ object Expr:
         else for a <- t(l); b <- t(r); res <- if a == b && numeric(a) then Right(a)
           else Left(s"'$op' takes two values of one kind, not ${a.show} and ${b.show}") yield res
       case Call(fn, args) if aggregates(fn) => aggregate(fn, args, handles, schema)
+      case Call("distance", Vector(a, b)) =>
+        def place(x: Expr): Either[String, Unit] = t(x).flatMap {
+          case Type.Point => Right(())
+          case Type.Entity(cls) if schema.prop(cls, "point").exists(_.tpe == Type.Point) => Right(())
+          case other => Left(s"distance of ${other.show}: not a place")
+        }
+        for _ <- place(a); _ <- place(b) yield Type.Distance
       case Call(fn, Vector(arg)) => t(arg).flatMap(at => property(fn, at, schema))
       case Call(fn, args) => Left(s"$fn takes one argument, not ${args.size}")
     result.flatMap { tt =>
@@ -214,6 +221,7 @@ object Expr:
     // a bare number against money or a duration: its main unit (`price(#v1) <= 150`)
     case (Type.Money, Type.Number) | (Type.Number, Type.Money) | (Type.Duration, Type.Number) |
          (Type.Number, Type.Duration) => true
+    case (Type.Distance, Type.Number) | (Type.Number, Type.Distance) => true
     case (Type.Entity(_), Type.Entity(_)) => true
     case _ => a == b && !a.isInstanceOf[Type.Many]
 

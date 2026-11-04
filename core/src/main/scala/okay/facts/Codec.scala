@@ -32,6 +32,8 @@ object Codec:
     case Value.Bool(b) => Json.obj("t" -> Json.str("bool"), "b" -> Json.bool(b))
     case Value.Entity(e) => Json.obj("t" -> Json.str("ent"), "ent" -> ent(e))
     case Value.Many(vs) => Json.obj("t" -> Json.str("many"), "of" -> Json.Arr(vs.map(value)))
+    case Value.Point(a, o) => Json.obj("t" -> Json.str("point"), "lat" -> Json.num(a), "lon" -> Json.num(o))
+    case Value.Meters(m) => Json.obj("t" -> Json.str("meters"), "m" -> Json.num(m))
 
   def valueOf(j: Json): Value = j("t").string match
     case "money" => Value.Money(j("minor").long, j("currency").string)
@@ -46,6 +48,8 @@ object Codec:
     case "bool" => Value.Bool(j("b").boolean)
     case "ent" => Value.Entity(entOf(j("ent")))
     case "many" => Value.Many(j("of").list.map(valueOf))
+    case "point" => Value.Point(j("lat").double, j("lon").double)
+    case "meters" => Value.Meters(j("m").long)
     case other => throw IllegalArgumentException(s"a value's type: $other")
 
   def found(f: Found): Json = Json.obj("ent" -> ent(f.ent), "visible" -> Json.Arr(f.visible.map((k, v) =>
