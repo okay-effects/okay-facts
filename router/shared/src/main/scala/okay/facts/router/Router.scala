@@ -53,12 +53,12 @@ final case class Route(intent: String, by: String, p: Double = 0.0, margin: Doub
  */
 final class Router(val rules: Vector[(String, String, Re)], val probe: Probe,
                    val safe: Vector[(String, String, Re)] = Vector.empty,
-                   val guard: Vector[(String, String, Re)] = Vector.empty,
+                   val guard: Guard = Guard.empty,
                    val combiner: Option[Combiner] = None):
   def byRule(text: String): Option[(String, String)] = rules.find((_, _, re) => re.test(text)).map((i, p, _) => (i, p))
   def bySafe(text: String): Option[(String, String)] = safe.find((_, _, re) => re.test(text)).map((i, p, _) => (i, p))
   /** the guard's first category whose pattern matches: (category, pattern) */
-  def byGuard(text: String): Option[(String, String)] = guard.find((_, _, re) => re.test(text)).map((c, p, _) => (c, p))
+  def byGuard(text: String): Option[(String, String)] = guard.check(text)
   /** the intents any of whose rules match */
   def hits(text: String): Set[String] = rules.collect { case (i, _, re) if re.test(text) => i }.toSet
 
@@ -96,7 +96,7 @@ final class Router(val rules: Vector[(String, String, Re)], val probe: Probe,
   /** THE TURN'S DECISION: the guard, a safe rule, else the combiner (none: the glance) */
   def decide(table: Table, text: String, prev: Option[String] = None, extras: Map[String, Double] = Map.empty)
     : Route =
-    byGuard(text).map((c, g) => Route("other", "guard", 1.0, 1.0, g, c))
+    guard.route(text)
       .orElse(bySafe(text).map((i, p) => Route(i, "safe", 1.0, 1.0, p)))
       .getOrElse(combiner match
         case None => glance(table, text)
@@ -113,7 +113,7 @@ object Router:
     val sorted = intents.sortBy(_.rank)
     new Router(sorted.flatMap(i => i.rules.map(r => (i.name, r, Rules.compile(r)))), probe,
       sorted.flatMap(i => i.safe.map(r => (i.name, r, Rules.compile(r)))),
-      guard.map((c, g) => (c, g, Rules.compile(g))),
+      Guard(guard),
       combiner)
 
   /** the evidence's own names, per class: `probe:<c>`, `rule:<c>`, `prev:<c>` */

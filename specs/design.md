@@ -783,6 +783,11 @@ every language, and the validator runs on the router's answers at runtime as on 
   candidates (1 over how many have it) —, its meaning beside them; a name with all its words wins by the text's words it
   accounts for ("haircut and beard" is the haircut with a beard, not the beard); a threshold and a margin — two close:
   ambiguous, the host asks.
+- **The guard** (`Guard`, operator 2026-11-05): the guard's patterns by category alone — rules only, no table, no
+  probe, no router (`Guard.parse(json)`, `check`, `route`: the same route the router's decision gives); a host runs it
+  as the FIRST step of every turn, before its router and its model lane, in every configuration (the router on, off,
+  its table missing or failed to load, any platform). The router holds the same `Guard`. `Table.empty` (no units: a
+  nearness by words alone) serves a guarded answer that names a service with no table.
 - **The router** (`Router`, round 3): the guard's patterns, then the safe rules, then the combiner over the evidence
   (the probe's probabilities, every intent's rule hits, a follow-up's previous intent, the host's evidence) →
   `Route(intent, by: guard | safe | combined | unknown, p, margin, rule, guard)` — `guard` the guard's category when
@@ -839,6 +844,12 @@ rules answering with p = 1, which no threshold can stop. So a turn is decided in
    counter per category (never the text) and a strike count per conversation (injections and others' data): past
    its limit, a cool-down of fixed answers only (a rate limit, not a ban; okay-mall). A false refusal now has no model
    behind it, so the patterns are narrow and their false positives measured on every set (§16).
+   **Independent of the router** (operator, 2026-11-05): the guard is its own step (`Guard`), first in EVERY turn and
+   every configuration — the router lane on or off, its table missing or failed to load, a lane forced, the host's
+   platform —, needing no table: its patterns and its answers are data bundled with the host's code (never fetched
+   from storage), and its answers are the same in all of them (a service named by its words alone). If the guard's
+   data cannot load, the host fails CLOSED: no turn goes to the model unguarded — a fixed "temporarily unavailable,
+   contact the shop" answer, and an alert. The strike limit and the cool-down's length are the host's settings.
 2. **The safe rules** (`Intent.safe`, an explicitly short list — greetings, thanks, goodbyes, "help", "what can you
    do"): whole-message patterns whose answer has no fact and no slot; answered at once (`by = safe`). Nothing else is
    ever answered by a rule alone.

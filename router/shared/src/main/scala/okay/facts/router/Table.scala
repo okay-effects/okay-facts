@@ -131,6 +131,10 @@ object Table:
     val dim = meta.get("dim").flatMap(_.toIntOption).getOrElse(header("vecs")("shape").list(1).int)
     new Table(buf, va, int8, sa, wa, oa, la, n, labels, dim, meta)
 
+  /** a table of no units: no text has a vector, a nearness is its words' only (the guard's answers, which need no
+   * table: §17 "The turn decision") */
+  lazy val empty: Table = apply(write(Vector.empty, Vector.empty, Vector.empty, Map.empty))
+
   /** a key's bytes against bytes `[from, until)` of `b`, unsigned, lexicographic */
   def compare(key: Array[Byte], b: ByteBuffer, from: Int, until: Int): Int =
     val len = until - from
