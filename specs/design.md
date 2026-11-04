@@ -550,6 +550,19 @@ none. The rows of 2026-11-03 above are kept for comparison (another set: 180 tur
   Read in place from a view of R2's bytes (okay-serverless' `Blobs.view`, released 2026-11-04): no copy; the chat's
   first open warms the conversation's object (okay-mall).
 
+### The router lane, round 3 (operator 2026-11-04; §14.6, §17)
+
+- **The fallback model: `glm-5.3`** (operator, 2026-11-04): `@cf/zai-org/glm-5.3` (L3, 32/36 by the TCK of
+  2026-11-04) is the model lane's fallback (`CHAT_MODEL_FALLBACK`), asked when the default fails (its per-minute
+  limit past the port's retries, an error); `deepseek-v4.1-flash-1017` stays the default. At 4.7 times the default's
+  price it is asked only on a failure.
+- **Rules are evidence, not verdicts** (§17 "The turn decision"): the guard → the model lane; the safe rules (greet,
+  help) the only ones answered alone; the combiner for everything else, calibrated out of fold. Train/dev: the
+  intents' examples (the probe), the 180 + 45 turns of 2026-11-03 and the 340 of 2026-11-04 (spent as a held-out set:
+  from now on train/dev only, as the 180 became in round 2); the new held-out set of round 3 (okay-mall
+  `measure/2026-11-04-r3/`) frozen before any tuning and run once.
+- **Reads in one call** (`Facts.Many`, `Facts.Expand`); **the probe and the combiner binary** (`Weights`).
+
 ### Implementation notes (2026-11-03)
 
 - **Find** is generous with what models write: a link filtered by a handle, by a name (`service = haircut`) or by a
@@ -633,27 +646,32 @@ every language, and the validator runs on the router's answers at runtime as on 
   when a text uses it. Its coverage (the share of a text's words it knows) is reported.
 - **The probe** (`Probe`): multinomial logistic regression over the table's vectors (okay's `Probe`: weights from
   zero, rows in order, 300 epochs, rate 0.5 — deterministic), fitted at BUILD time by a tool; the host carries the
-  weights (JSON, classes × dim).
+  weights — binary since round 3 (`Weights`: a 4-byte length, a small JSON header — the classes, the shapes, the
+  combiner's evidence names, temperature and threshold —, then little-endian F32; 16 × 256 read in well under a
+  millisecond, where the JSON took 10.7 ms in a Worker's isolate).
 - **Language** (`Detect`): the message's script (any Cyrillic letter: Cyrillic), then letters only one language has
   and everyday words; an amount with its currency counts for none («do 150 zł» is not Polish); no evidence: the
   conversation's last language within the script, else the page's.
-- **Slots, generic** — `When`: a day (today, tomorrow, the day after, a weekday, the weekend — its Saturday —,
-  `5.11`, `5 listopada`), a part of the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`,
-  `до 12`, `after 5pm`) in pl, uk, ru, en — Ukrainian and Russian typed in Latin letters too (`zavtra`, `v pyatnicu
-  posle 16`) —, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`,
-  `under 150`, `max 150`, `deshevle 100`); `Nearest`: the candidates nearest a text (each unit of the text against
-  each candidate's name, in any of its languages): its words first — a name's word present in the text by its form
-  (`near`: the same, a start of 4 letters, a stem in common, one edit), in plain Latin (`Spell.fold`: "strizhka" is
-  "стрижка"), or by the host's `Lexicon` (groups of stems of one thing — "szafa", "meble", "wardrobe", "шкаф"; a
-  verb's prefix passed over: "po|czyścić"; a stem of 3 letters the whole word only; words that say nothing of which
-  service it is ignored: "drobna", "small", "telefon"), each word weighed by its rarity among the candidates (1 over
-  how many have it) —, its meaning beside them; a name with all its words wins by the text's words it accounts for
-  ("haircut and beard" is the haircut with a beard, not the beard); a threshold and a margin — two close:
-  ambiguous, the host asks.
-- **The router** (`Router`): the intents' rules first (in rank order), then the probe over the message's vector →
-  `Route(intent, by: rule | probe | unknown, p, margin)`; `confident` when by a rule, or `p` and the margin pass the
-  host's thresholds (calibrated on held-out authored rows, recorded in §16).
-- **The data** (`Intents`): `{intents: [{name, rank, rules: [...], examples: {pl: [...], uk: [...], ru: [...],
+- **Slots, generic** — `When`: a day (today, tomorrow, the day after, a weekday, the weekend — its Saturday —, `5.11`,
+  `5 listopada` — a month only as its own word next to a day's number, never a stem that starts a name: "Marek's 10:15",
+  "u Marka 5" are no March), a part of the day (morning, afternoon, evening) and a time (`o 17`, `po 17`, `o 10:30`, `до
+  12`, `after 5pm`) in pl, uk, ru, en — Ukrainian and Russian typed in Latin letters too (`zavtra`, `v pyatnicu posle
+  16`) —, relative to today in Warsaw (§ Zone); `Amount`: a price limit (`do 150 zł`, `poniżej 150`, `до 150`, `under
+  150`, `max 150`, `deshevle 100`); `Nearest`: the candidates nearest a text (each unit of the text against each
+  candidate's name, in any of its languages): its words first — a name's word present in the text by its form (`near`:
+  the same, a start of 4 letters, a stem in common, one edit), in plain Latin (`Spell.fold`: "strizhka" is "стрижка"),
+  or by the host's `Lexicon` (groups of stems of one thing — "szafa", "meble", "wardrobe", "шкаф"; a verb's prefix
+  passed over: "po|czyścić"; a stem of 3 letters the whole word only; words that say nothing of which service it is
+  ignored: "drobna", "small", "telefon"), each word weighed by its rarity among the candidates (1 over how many have it)
+  —, its meaning beside them; a name with all its words wins by the text's words it accounts for ("haircut and beard" is
+  the haircut with a beard, not the beard); a threshold and a margin — two close: ambiguous, the host asks.
+- **The router** (`Router`, round 3): the guard's patterns, then the safe rules, then the combiner over the evidence
+  (the probe's probabilities, every intent's rule hits, a follow-up's previous intent, the host's evidence) →
+  `Route(intent, by: guard | safe | combined | unknown, p, margin)`; `confident` when safe, or the combiner's `p`
+  passes the threshold its file carries (calibrated out of fold on train/dev, §16; "The turn decision" below). A
+  rule's hit is evidence, never an answer by itself.
+- **The data** (`Intents`): `{guard: [...], intents: [{name, rank, safe: [...], rules: [...], examples: {pl: [...],
+  uk: [...], ru: [...],
   en: [...]}}]}` — a host's own file; the probe is fitted on its examples, the table distilled over its units. The
   `Lexicon` (`{groups: [[stems…]…], ignore: [words…]}`) is the host's too.
 - **Tools** (`tools/`, scala-cli, never Python): `table.scala` (the units of a corpus embedded by the ONNX encoder —
@@ -686,12 +704,51 @@ kept as the model lane keeps it (the user's words, "Found: …" with the handles
 `{params, template}`), so a later turn on the model lane knows what the router said; audited (`Audited.Routed`:
 intent, confidence; the reads as any answer's).
 
-### The turn decision (the host's)
+### The turn decision (the host's; round 3, operator 2026-11-04: rules are evidence, not verdicts)
 
-Router first: a confident route whose slots resolve answers by the router; anything else — a probe below the
-thresholds, a message of no known word, a slot it cannot resolve that the intent needs — goes to the model lane as
-before (its validator, its policy, its budget). The host logs per turn the lane, the intent and the confidence —
-never the message's words. A host can force a lane (tests, the measurement).
+A rule that fires is not an answer: on the held-out set of 2026-11-04 31 of the router's 36 wrong intents came from
+rules answering with p = 1, which no threshold can stop. So a turn is decided in three steps, in order:
+
+1. **The guard** (`Intents.guard`, the host's patterns): a prompt injection or a question about the assistant itself
+   (ignore or forget the instructions, the system prompt, "you are now", role-play, a developer mode, a price set by
+   the user), other people's data (other clients, who booked, a master's private phone, earnings), payments and
+   amenities, advice and recommendations, out of domain (the weather, sports, code, recipes, poems) → **the model
+   lane**, never a domain answer. (The model lane is safe for these by §2: it has no value to leak.)
+2. **The safe rules** (`Intent.safe`, an explicitly short list — greetings, thanks, goodbyes, "help", "what can you
+   do"): whole-message patterns whose answer has no fact and no slot; answered at once (`by = safe`). Nothing else is
+   ever answered by a rule alone.
+3. **The combiner** (`Combiner`) for everything else: multinomial logistic regression over a turn's evidence, its
+   output divided by a temperature — a calibrated probability per intent:
+   - the probe's probabilities (one per intent);
+   - the rules' hits (one per intent: any of its rules matches — every rule tried, not the first);
+   - a short follow-up's context: the previous question's intent (probe and rules), one per intent, when the message
+     is short (≤ 2 words of 3 letters or more, ≤ 5 words) — zeros otherwise;
+   - the host's evidence, named in the combiner's file (okay-shop: a service of the shop named by all its words, a
+     master named, a person named who is not the shop's, a place named, a day or a time, an exact time, a booking's
+     word, a price limit, "alone" ("samo", "only", "тільки"), the mall's home, a shop named by its name there, short,
+     opened by "a"/"and"/"а"/"і").
+   The answer is the top intent when its probability is at least the threshold (and it is not `other`); else the
+   model lane. No known word and no rule hit: the model lane (`unknown`).
+
+**Calibration.** The combiner is fitted at build time (`okay.mall.Fit`, okay-mall's train/dev turns: the sets of
+2026-11-03 and the spent held-out of 2026-11-04 — never a frozen held-out set), with L2, from zero; 5-fold: each
+turn's probabilities from a fit on the other four folds (out of fold), the temperature fitted on them (least
+log-loss), then the threshold — the lowest whose out-of-fold router precision (the right intent among the answered;
+a turn meant for the model answered is wrong) is ≥ 97% —, the precision–coverage curve recorded (§16). The final
+weights are fitted on all of train/dev; the file carries the weights, the temperature, the threshold and the
+evidence's names (binary, §17 "The probe").
+
+Then, as before: a decided intent whose slots resolve answers by its authored answer; a slot it cannot resolve that
+the intent needs → the model lane. The host logs per turn the lane, the intent, the probability and how it was
+decided (`guard`, `safe`, `combined`, `unknown`) — never the message's words. A host can force a lane (tests, the
+measurement).
+
+**Reads in one call.** A turn's reads of a shop's facts are batched (core: `Facts.Many` — several operations in one
+round trip; `Facts.Expand` — a find and the named properties of each entity found, answered where the data is): the
+router asks, in one call, everything a turn of a shop may need (its services in every language with their prices,
+durations and whether bookable; its masters with their names; its places; the shop's own properties). The host's
+handler keeps a turn's answers (a turn is a snapshot: an action forgets them), so the later reads and the
+renderer's are answered from them.
 
 ### Measure (stage 6, §14)
 
