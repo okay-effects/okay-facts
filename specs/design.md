@@ -671,7 +671,8 @@ with fixed answers (no model): a guard's answer to a turn meant for the model co
   with three quarters of its words). The demo shops are of six niches, so no two shops' services compare: "cheaper
   elsewhere" says there is no such service elsewhere. The §12 flow's cross-shop comparison (a manicure against a
   men's haircut) is now refused (`comparable`) and the model answers again without it.
-- **When**: a bare "12:00" after "до"/"do"/"until" is the limit, not the time asked (it made "є час до 12:00" a booking).
+- **When**: a bare "12:00" after "до"/"do"/"until" is the limit, not the time asked (it made "є час до 12:00" a
+  booking).
 - **Open** (round 5, BACKLOG): the 97% on fresh text (88.9%); places typed in Latin letters for Cyrillic ("v Sopote",
   "a do Varshavy?") when the combiner says a price; a shop named with a typo ("Barber Dmeo") or in Cyrillic
   transliteration of a Polish name ("пральня бяла"); the hours asked as "графік?", "по вторникам работаете?";
