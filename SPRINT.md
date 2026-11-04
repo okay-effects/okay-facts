@@ -64,7 +64,8 @@ Stages of BACKLOG.md in flight (specs/design.md §14); decisions and results in 
   6. The measurement on the new set, run once: auto / model / usual beside 2026-11-03 and 2026-11-04 (§14.6).
 - [x] **distance and near** (operator 2026-11-04: okay-mall's geolocation, distance and maps) — `distance(#a, #b)`,
   `Value.Point`, `Value.Meters`, the router's `Near` slot (§6, §17); released with okay-mall's maps.
-- [ ] **the guard answers** (operator 2026-11-04: a guarded turn never goes to the model lane) — §17 "The turn
+- [x] **the guard answers** (operator 2026-11-04: a guarded turn never goes to the model lane; done 2026-11-04:
+  released okay-facts and okay-shop 0.1.0, okay-mall deployed, verify-apex 27/27; false positives 11 → 1, §16) — §17 "The turn
   decision" step 1, §16. Plan: 1. okay-facts: the guard as categories in data (`{category, patterns}`), `Route.guard`;
   tests; release 0.1.0. 2. okay-shop: `intents.json`'s guard in categories (injection, others, bargain, health,
   payments, amenities, advice, domain), narrowed by the false positives measured on every set (okay-mall

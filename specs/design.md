@@ -614,6 +614,23 @@ the demo shops' data (pl 128, uk 64, ru 64, en 64; 51 for the model, 20 injectio
 - **Open** (round 4): the 97% on fresh text; a Cyrillic place's evidence; advice and payments in more words; a
   comparison's relevance (an unrelated cheaper service is an exact value of a wrong reference).
 
+### The guard answers (operator 2026-11-04; §17 "The turn decision")
+
+- **No model behind the guard**: a guarded turn is answered by the host's fixed authored answer for its category
+  (okay-shop: injection, others, bargain, health, payments, amenities, advice, domain — `answers.json` `guard.*`, the
+  shop's values by the resolver: its name, a few services, the price in context, the address, its contact or page, the
+  client's own booking; the mall's home without values). Validated like any authored answer; never the user's words.
+- **The guard is data by category** (`{category, patterns}`, `Route.guard`); okay-mall counts each category (never
+  the text) and cools a conversation down for 10 minutes after its 3rd injection or others'-data turn (fixed answers
+  only: a rate limit, not a ban).
+- **False positives** (okay-mall `scripts/guard-fp.scala`: an in-domain turn — an intent not `other` — the guard
+  takes), on 2026-11-03's 180 and dev 45, 2026-11-04's 340, round 3's 320 (all now dev data) and the intents'
+  1 130 phrasings: **11 before → 1 after** (round 3: "warto do was iść?", "dziewczyny polecacie?" — reviews —, "як
+  написати адміністрації торгового центру?" — "торг" was bargaining —; phrasings: "co zrobić?" after "nie dam rady
+  jutro" in four languages — manage —, "ile płacę za …" three times — price —, "czy jest parking przy was?"). The one left: "czy jest parking przy
+  was?" (a phrasing of `address`), now an amenity's answer that gives the address. Turns meant for the model the guard
+  takes: 87 of 118 → 104 of 118 (the rest go to the combiner, its `other` to the model lane).
+
 ### Implementation notes (2026-11-03)
 
 - **Find** is generous with what models write: a link filtered by a handle, by a name (`service = haircut`) or by a
